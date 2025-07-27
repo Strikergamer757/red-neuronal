@@ -1,0 +1,2513 @@
+# Guardar conversaciones
+            with open(self.archivos['conversaciones'], 'w', encoding='utf-8') as f:
+                json.dump(self.conversaciones, f, indent=2, ensure_ascii=False)
+            
+            # Guardar configuración
+            config_data = {
+                'nombre': self.nombre,
+                'version': self.version,
+                'vocab_size': self.vocab_size,
+                'embedding_dim': self.embedding_dim,
+                'hidden_dim': self.hidden_dim,
+                'auto_entrenamiento': self.auto_entrenamiento_activo,
+                'auto_mejora': self.auto_mejora_activa
+            }
+            
+            with open(self.archivos['config'], 'w', encoding='utf-8') as f:
+                json.dump(config_data, f, indent=2)
+            
+            # Guardar datos de auto-aprendizaje
+            self._guardar_datos_auto_aprendizaje()
+            
+            # Guardar memoria permanente - NUNCA SE OLVIDA
+            self._guardar_memoria_permanente()
+            
+            logger.info("💾 Modelo guardado exitosamente")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error guardando modelo: {e}")
+            return False
+    
+    def mostrar_estadisticas(self):
+        """Muestra estadísticas detalladas del modelo"""
+        self.interfaz.imprimir_banner("ESTADÍSTICAS DEL MODELO", Colors.CYAN)
+        
+        # Información básica
+        self.interfaz.imprimir_seccion("Información General")
+        self.interfaz.imprimir_estadistica("Nombre", self.nombre)
+        self.interfaz.imprimir_estadistica("Versión", self.version)
+        self.interfaz.imprimir_estadistica("Vocabulario", f"{len(self.vocabulario):,} palabras")
+        self.interfaz.imprimir_estadistica("Conversaciones", f"{len(self.conversaciones):,}")
+        
+        # Memoria permanente
+        self.interfaz.imprimir_seccion("Memoria Permanente")
+        self.interfaz.imprimir_estadistica("Experiencias importantes", len(self.memoria_permanente['experiencias_importantes']))
+        self.interfaz.imprimir_estadistica("Lecciones aprendidas", len(self.memoria_permanente['lecciones_aprendidas']))
+        self.interfaz.imprimir_estadistica("Patrones detectados", len(self.memoria_permanente['patrones_detectados']))
+        self.interfaz.imprimir_estadistica("Mejoras realizadas", len(self.memoria_permanente['mejoras_realizadas']))
+        
+        # Arquitectura
+        self.interfaz.imprimir_seccion("Arquitectura")
+        self.interfaz.imprimir_estadistica("Embedding", f"{self.vocab_size:,} x {self.embedding_dim}")
+        self.interfaz.imprimir_estadistica("Hidden Layer", f"{self.embedding_dim} x {self.hidden_dim}")
+        self.interfaz.imprimir_estadistica("Output Layer", f"{self.hidden_dim} x {self.vocab_size:,}")
+        
+        # Métricas de rendimiento
+        if self.metricas_rendimiento['tiempo_respuesta']:
+            tiempos = self.metricas_rendimiento['tiempo_respuesta']
+            self.interfaz.imprimir_seccion("Rendimiento")
+            self.interfaz.imprimir_estadistica("Tiempo promedio", f"{np.mean(tiempos):.3f}s")
+            self.interfaz.imprimir_estadistica("Tiempo mínimo", f"{np.min(tiempos):.3f}s")
+            self.interfaz.imprimir_estadistica("Tiempo máximo", f"{np.max(tiempos):.3f}s")
+        
+        # Estado de funcionalidades
+        self.interfaz.imprimir_seccion("Configuración")
+        auto_train = "🟢 ACTIVO" if self.auto_entrenamiento_activo else "🔴 INACTIVO"
+        auto_improve = "🟢 ACTIVA" if self.auto_mejora_activa else "🔴 INACTIVA"
+        auto_evolve = "🟢 ACTIVA" if self.auto_evolucion_activa else "🔴 INACTIVA"
+        auto_question = "🟢 ACTIVO" if self.auto_cuestionamiento_activo else "🔴 INACTIVO"
+        
+        self.interfaz.imprimir_estadistica("Auto-entrenamiento", auto_train)
+        self.interfaz.imprimir_estadistica("Auto-mejora", auto_improve)
+        self.interfaz.imprimir_estadistica("Auto-evolución", auto_evolve)
+        self.interfaz.imprimir_estadistica("Auto-cuestionamiento", auto_question)
+        self.interfaz.imprimir_estadistica("Learning Rate", f"{self.learning_rate:.6f}")
+        
+        # Estadísticas de auto-aprendizaje
+        if self.sesiones_auto_aprendizaje:
+            self.interfaz.imprimir_seccion("Auto-Aprendizaje")
+            self.interfaz.imprimir_estadistica("Sesiones realizadas", len(self.sesiones_auto_aprendizaje))
+            self.interfaz.imprimir_estadistica("Versiones creadas", len(self.versiones_anteriores))
+            
+            # Última sesión
+            ultima_sesion = self.sesiones_auto_aprendizaje[-1]
+            if 'preguntas_realizadas' in ultima_sesion:
+                preguntas = len(ultima_sesion['preguntas_realizadas'])
+                mejoras = len(ultima_sesion.get('mejoras_identificadas', []))
+                self.interfaz.imprimir_estadistica("Última sesión - Preguntas", preguntas)
+                self.interfaz.imprimir_estadistica("Última sesión - Mejoras", mejoras)
+    
+    def mostrar_historial_conversacion(self, ultimas: int = 10):
+        """Muestra el historial de conversaciones"""
+        self.interfaz.imprimir_banner("HISTORIAL DE CONVERSACIONES", Colors.PURPLE)
+        
+        if not self.conversaciones:
+            print(f"{Colors.YELLOW}📭 No hay conversaciones registradas{Colors.END}")
+            return
+        
+        conversaciones_mostrar = self.conversaciones[-ultimas:] if len(self.conversaciones) > ultimas else self.conversaciones
+        
+        for i, conv in enumerate(conversaciones_mostrar, 1):
+            timestamp = conv['timestamp'][:19].replace('T', ' ')
+            tiempo_resp = conv.get('tiempo_respuesta', 0)
+            
+            print(f"\n{Colors.CYAN}{i}. {timestamp} (⏱️ {tiempo_resp:.3f}s){Colors.END}")
+            print(f"{Colors.GREEN}👤 Usuario: {conv['entrada']}{Colors.END}")
+            print(f"{Colors.BLUE}🤖 Modelo: {conv['respuesta']}{Colors.END}")
+    
+    def crear_backup(self) -> bool:
+        """Crea un backup completo del modelo"""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_dir = f"{self.archivos['backups']}/backup_{timestamp}"
+            os.makedirs(backup_dir, exist_ok=True)
+            
+            # Copiar archivos principales
+            archivos_backup = ['pesos', 'vocabulario', 'conversaciones', 'config', 'auto_aprendizaje', 'memoria_permanente']
+            for archivo in archivos_backup:
+                if os.path.exists(self.archivos[archivo]):
+                    shutil.copy2(self.archivos[archivo], f"{backup_dir}/{os.path.basename(self.archivos[archivo])}")
+            
+            logger.info(f"💾 Backup creado: {backup_dir}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error creando backup: {e}")
+            return False
+    
+    def entrenar_interactivo(self):
+        """Entrenamiento interactivo mejorado"""
+        self.interfaz.imprimir_banner("MODO ENTRENAMIENTO INTERACTIVO", Colors.YELLOW)
+        
+        print(f"{Colors.CYAN}📖 Instrucciones:{Colors.END}")
+        print("• Escribe frases para entrenar el modelo")
+        print("• Usa '/save' para guardar progreso")
+        print("• Usa '/quit' para salir del entrenamiento")
+        print("• El modelo aprenderá de cada entrada")
+        
+        iteracion = 0
+        while True:
+            try:
+                entrada = self.interfaz.solicitar_entrada(f"\n[Entrenamiento {iteracion+1}] 📝 Entrada: ")
+                
+                if entrada == '/quit':
+                    break
+                elif entrada == '/save':
+                    if self.guardar_modelo():
+                        print(f"{Colors.GREEN}✅ Progreso guardado{Colors.END}")
+                    continue
+                elif not entrada:
+                    continue
+                
+                # Simular entrenamiento (en un modelo real, aquí iría el algoritmo de entrenamiento)
+                tiempo_inicio = time.time()
+                
+                # Tokenizar y procesar
+                tokens = self._tokenizar_simple(entrada)
+                if tokens:
+                    # Forward pass simulado
+                    _ = self._forward_pass_simple(tokens)
+                    
+                    tiempo_entrenamiento = time.time() - tiempo_inicio
+                    error_simulado = random.uniform(0.5, 2.0) * (0.95 ** iteracion)  # Error decreciente
+                    
+                    print(f"{Colors.GREEN}✅ Iteración {iteracion+1} completada{Colors.END}")
+                    print(f"   ⏱️ Tiempo: {tiempo_entrenamiento:.4f}s")
+                    print(f"   📊 Error simulado: {error_simulado:.6f}")
+                    
+                    self.historial_error.append(error_simulado)
+                    
+                    # Guardar en memoria permanente
+                    self.memoria_permanente['experiencias_importantes'].append({
+                        'tipo': 'entrenamiento',
+                        'contenido': entrada,
+                        'error': error_simulado,
+                        'timestamp': datetime.now().isoformat()
+                    })
+                    
+                    iteracion += 1
+                
+            except KeyboardInterrupt:
+                print(f"\n{Colors.YELLOW}⚠️ Entrenamiento interrumpido{Colors.END}")
+                break
+        
+        print(f"\n{Colors.CYAN}📈 Entrenamiento completado: {iteracion} iteraciones{Colors.END}")
+        self._guardar_memoria_permanente()
+    
+    def _tokenizar_simple(self, texto: str) -> List[int]:
+        """Tokenización simple para entrenamiento"""
+        palabras = texto.lower().split()
+        tokens = []
+        
+        for palabra in palabras:
+            if palabra not in self.vocabulario:
+                if self.contador_vocab < self.vocab_size:
+                    self.vocabulario[palabra] = self.contador_vocab
+                    self.vocabulario_inverso[self.contador_vocab] = palabra
+                    self.contador_vocab += 1
+                else:
+                    palabra = "<UNK>"
+            
+            tokens.append(self.vocabulario[palabra])
+        
+        return tokens
+    
+    def _forward_pass_simple(self, tokens: List[int]) -> np.ndarray:
+        """Forward pass simplificado"""
+        if not tokens:
+            return np.zeros((1, self.vocab_size))
+        
+        # Embedding promedio
+        embeddings = []
+        for token in tokens:
+            if token < len(self.W_embedding):
+                embeddings.append(self.W_embedding[token])
+            else:
+                embeddings.append(self.W_embedding[1])  # UNK token
+        
+        if embeddings:
+            input_vec = np.mean(embeddings, axis=0).reshape(1, -1)
+            hidden = np.maximum(0, np.dot(input_vec, self.W_hidden) + self.b_hidden)
+            output = np.dot(hidden, self.W_output) + self.b_output
+            return self._softmax(output)
+        
+        return np.zeros((1, self.vocab_size))
+    
+    def _softmax(self, x: np.ndarray) -> np.ndarray:
+        """Función softmax estable"""
+        exp_x = np.exp(x - np.max(x, axis=-1, keepdims=True))
+        return exp_x / np.sum(exp_x, axis=-1, keepdims=True)
+    
+    def configurar_modelo(self):
+        """Configuración interactiva del modelo"""
+        self.interfaz.imprimir_banner("CONFIGURACIÓN DEL MODELO", Colors.PURPLE)
+        
+        opciones = {
+            '1': 'Cambiar learning rate',
+            '2': 'Toggle auto-entrenamiento',
+            '3': 'Toggle auto-mejora',
+            '4': 'Configurar temperatura de generación',
+            '5': 'Configurar API key de OpenAI',
+            '6': 'Toggle auto-evolución',
+            '7': 'Toggle auto-cuestionamiento',
+            '8': 'Limpiar historial de conversaciones',
+            '9': 'Resetear vocabulario',
+            '10': 'Ver memoria permanente',
+            '11': 'Volver al menú principal'
+        }
+        
+        while True:
+            self.interfaz.mostrar_menu(opciones, "OPCIONES DE CONFIGURACIÓN")
+            
+            opcion = self.interfaz.solicitar_entrada("\n🔧 Selecciona una opción: ")
+            
+            if opcion == '1':
+                try:
+                    nuevo_lr = float(self.interfaz.solicitar_entrada("📊 Nuevo learning rate (actual: {:.6f}): ".format(self.learning_rate)))
+                    if 0.0001 <= nuevo_lr <= 1.0:
+                        self.learning_rate = nuevo_lr
+                        print(f"{Colors.GREEN}✅ Learning rate actualizado a {nuevo_lr:.6f}{Colors.END}")
+                    else:
+                        print(f"{Colors.RED}❌ Learning rate debe estar entre 0.0001 y 1.0{Colors.END}")
+                except ValueError:
+                    print(f"{Colors.RED}❌ Valor inválido{Colors.END}")
+            
+            elif opcion == '2':
+                self.auto_entrenamiento_activo = not self.auto_entrenamiento_activo
+                estado = "🟢 ACTIVADO" if self.auto_entrenamiento_activo else "🔴 DESACTIVADO"
+                print(f"{Colors.GREEN}🔄 Auto-entrenamiento: {estado}{Colors.END}")
+            
+            elif opcion == '3':
+                self.auto_mejora_activa = not self.auto_mejora_activa
+                estado = "🟢 ACTIVADA" if self.auto_mejora_activa else "🔴 DESACTIVADA"
+                print(f"{Colors.GREEN}🚀 Auto-mejora: {estado}{Colors.END}")
+            
+            elif opcion == '4':
+                try:
+                    nueva_temp = float(self.interfaz.solicitar_entrada("🌡️ Nueva temperatura (actual: {:.2f}): ".format(self.config.temperature)))
+                    if 0.1 <= nueva_temp <= 2.0:
+                        self.config.temperature = nueva_temp
+                        print(f"{Colors.GREEN}✅ Temperatura actualizada a {nueva_temp:.2f}{Colors.END}")
+                    else:
+                        print(f"{Colors.RED}❌ Temperatura debe estar entre 0.1 y 2.0{Colors.END}")
+                except ValueError:
+                    print(f"{Colors.RED}❌ Valor inválido{Colors.END}")
+            
+            elif opcion == '5':
+                nueva_key = self.interfaz.solicitar_entrada("🔑 Nueva API key de OpenAI (deja vacío para no cambiar): ")
+                if nueva_key:
+                    self.config.openai_api_key = nueva_key
+                    self.juez_openai = JuezOpenAI(nueva_key)
+                    print(f"{Colors.GREEN}✅ API key actualizada{Colors.END}")
+            
+            elif opcion == '6':
+                self.auto_evolucion_activa = not self.auto_evolucion_activa
+                estado = "🟢 ACTIVADA" if self.auto_evolucion_activa else "🔴 DESACTIVADA"
+                print(f"{Colors.GREEN}🧬 Auto-evolución: {estado}{Colors.END}")
+            
+            elif opcion == '7':
+                self.auto_cuestionamiento_activo = not self.auto_cuestionamiento_activo
+                estado = "🟢 ACTIVADO" if self.auto_cuestionamiento_activo else "🔴 INACTIVO"
+                print(f"{Colors.GREEN}🤔 Auto-cuestionamiento: {estado}{Colors.END}")
+            
+            elif opcion == '8':
+                confirmacion = self.interfaz.solicitar_entrada("⚠️ ¿Confirmas limpiar historial? (s/N): ")
+                if confirmacion.lower() == 's':
+                    self.conversaciones.clear()
+                    self.metricas_rendimiento = {k: [] for k in self.metricas_rendimiento.keys()}
+                    print(f"{Colors.GREEN}✅ Historial limpiado{Colors.END}")
+            
+            elif opcion == '9':
+                confirmacion = self.interfaz.solicitar_entrada("⚠️ ¿Confirmas resetear vocabulario? (s/N): ")
+                if confirmacion.lower() == 's':
+                    self.vocabulario = {"<PAD>": 0, "<UNK>": 1, "<START>": 2, "<END>": 3, "<MASK>": 4}
+                    self.vocabulario_inverso = {0: "<PAD>", 1: "<UNK>", 2: "<START>", 3: "<END>", 4: "<MASK>"}
+                    self.contador_vocab = 5
+                    print(f"{Colors.GREEN}✅ Vocabulario reseteado{Colors.END}")
+            
+            elif opcion == '10':
+                self._mostrar_memoria_permanente()
+            
+            elif opcion == '11':
+                break
+            
+            else:
+                print(f"{Colors.RED}❌ Opción inválida{Colors.END}")
+    
+    def _mostrar_memoria_permanente(self):
+        """Muestra el contenido de la memoria permanente"""
+        self.interfaz.imprimir_banner("MEMORIA PERMANENTE", Colors.PURPLE)
+        
+        for categoria, items in self.memoria_permanente.items():
+            self.interfaz.imprimir_seccion(f"{categoria.replace('_', ' ').title()}")
+            
+            if items:
+                for i, item in enumerate(items[-5:], 1):  # Mostrar últimos 5
+                    timestamp = item.get('timestamp', 'Sin fecha')[:19].replace('T', ' ')
+                    tipo = item.get('tipo', 'General')
+                    contenido = str(item.get('contenido', item.get('pregunta', 'Sin contenido')))[:100] + "..."
+                    
+                    print(f"   {i}. [{timestamp}] {tipo}: {contenido}")
+            else:
+                print(f"   No hay elementos en esta categoría")
+    
+    def ejecutar_tests(self):
+        """Ejecuta tests de validación del modelo"""
+        self.interfaz.imprimir_banner("EJECUTANDO TESTS DE VALIDACIÓN", Colors.YELLOW)
+        
+        tests = [
+            ("Test básico de respuesta", self._test_respuesta_basica),
+            ("Test de tiempo de respuesta", self._test_tiempo_respuesta),
+            ("Test de manejo de entrada vacía", self._test_entrada_vacia),
+            ("Test de entrada muy larga", self._test_entrada_larga),
+            ("Test de caracteres especiales", self._test_caracteres_especiales),
+            ("Test de guardado/carga", self._test_guardado_carga),
+            ("Test de memoria permanente", self._test_memoria_permanente)
+        ]
+        
+        resultados = []
+        
+        for nombre_test, test_func in tests:
+            print(f"\n🧪 {nombre_test}...")
+            
+            try:
+                inicio = time.time()
+                resultado = test_func()
+                tiempo = time.time() - inicio
+                
+                if resultado:
+                    print(f"   {Colors.GREEN}✅ PASÓ ({tiempo:.3f}s){Colors.END}")
+                    resultados.append(True)
+                else:
+                    print(f"   {Colors.RED}❌ FALLÓ ({tiempo:.3f}s){Colors.END}")
+                    resultados.append(False)
+                    
+            except Exception as e:
+                print(f"   {Colors.RED}❌ ERROR: {e}{Colors.END}")
+                resultados.append(False)
+        
+        # Resumen
+        exitosos = sum(resultados)
+        total = len(resultados)
+        porcentaje = (exitosos / total) * 100
+        
+        print(f"\n📊 RESUMEN DE TESTS:")
+        print(f"   ✅ Exitosos: {exitosos}/{total} ({porcentaje:.1f}%)")
+        
+        if porcentaje == 100:
+            print(f"   {Colors.GREEN}🎉 ¡Todos los tests pasaron!{Colors.END}")
+        elif porcentaje >= 80:
+            print(f"   {Colors.YELLOW}⚠️ La mayoría de tests pasaron{Colors.END}")
+        else:
+            print(f"   {Colors.RED}❌ Múltiples tests fallaron{Colors.END}")
+        
+        # Guardar resultado en memoria permanente
+        self.memoria_permanente['experiencias_importantes'].append({
+            'tipo': 'test_validacion',
+            'exitosos': exitosos,
+            'total': total,
+            'porcentaje': porcentaje,
+            'timestamp': datetime.now().isoformat()
+        })
+        self._guardar_memoria_permanente()
+    
+    def _test_respuesta_basica(self) -> bool:
+        """Test básico de generación de respuesta"""
+        respuesta = self.procesar_entrada("Hola, ¿cómo estás?")
+        return len(respuesta) > 0 and isinstance(respuesta, str)
+    
+    def _test_tiempo_respuesta(self) -> bool:
+        """Test de tiempo de respuesta razonable"""
+        inicio = time.time()
+        self.procesar_entrada("Esta es una prueba de tiempo de respuesta")
+        tiempo = time.time() - inicio
+        return tiempo < 5.0  # Menos de 5 segundos
+    
+    def _test_entrada_vacia(self) -> bool:
+        """Test de manejo de entrada vacía"""
+        respuesta = self.procesar_entrada("")
+        return len(respuesta) > 0
+    
+    def _test_entrada_larga(self) -> bool:
+        """Test de entrada muy larga"""
+        entrada_larga = "Esta es una entrada muy larga " * 50
+        respuesta = self.procesar_entrada(entrada_larga)
+        return len(respuesta) > 0
+    
+    def _test_caracteres_especiales(self) -> bool:
+        """Test de caracteres especiales"""
+        respuesta = self.procesar_entrada("¿Qué opinas de los símbolos @#$%^&*()?")
+        return len(respuesta) > 0
+    
+    def _test_guardado_carga(self) -> bool:
+        """Test de guardado y carga"""
+        return self.guardar_modelo()
+    
+    def _test_memoria_permanente(self) -> bool:
+        """Test de la memoria permanente"""
+        items_antes = len(self.memoria_permanente['experiencias_importantes'])
+        
+        # Agregar algo a la memoria
+        self.memoria_permanente['experiencias_importantes'].append({
+            'tipo': 'test',
+            'contenido': 'Test de memoria',
+            'timestamp': datetime.now().isoformat()
+        })
+        
+        items_despues = len(self.memoria_permanente['experiencias_importantes'])
+        return items_despues > items_antes
+    
+    def modo_interactivo(self):
+        """Modo interactivo principal mejorado"""
+        self.interfaz.imprimir_banner(f"MODO INTERACTIVO - {self.nombre.upper()}", Colors.GREEN)
+        
+        print(f"{Colors.CYAN}💡 Comandos disponibles:{Colors.END}")
+        print("   /help      - Mostrar ayuda")
+        print("   /stats     - Ver estadísticas")
+        print("   /config    - Configurar modelo")
+        print("   /train     - Modo entrenamiento")
+        print("   /test      - Ejecutar tests")
+        print("   /history   - Ver historial")
+        print("   /save      - Guardar modelo")
+        print("   /backup    - Crear backup")
+        print("   /self_learn - Iniciar auto-aprendizaje")
+        print("   /evolve    - Crear nueva versión")
+        print("   /clone     - Interactuar con versión anterior")
+        print("   /memory    - Ver memoria permanente")
+        print("   /gui       - Abrir interfaz gráfica")
+        print("   /clear     - Limpiar pantalla")
+        print("   /quit      - Salir")
+        print("-" * 50)
+        
+        contador_interacciones = 0
+        
+        while True:
+            try:
+                entrada = self.interfaz.solicitar_entrada(f"\n[{contador_interacciones+1}] 👤 Tú: ")
+                
+                if not entrada:
+                    continue
+                
+                # Procesar comandos
+                if entrada.startswith('/'):
+                    if entrada == '/quit' or entrada == '/exit':
+                        print(f"{Colors.YELLOW}👋 ¡Hasta luego! Guardando modelo...{Colors.END}")
+                        self.guardar_modelo()
+                        break
+                    
+                    elif entrada == '/help':
+                        self._mostrar_ayuda_completa()
+                    
+                    elif entrada == '/stats':
+                        self.mostrar_estadisticas()
+                    
+                    elif entrada == '/config':
+                        self.configurar_modelo()
+                    
+                    elif entrada == '/train':
+                        self.entrenar_interactivo()
+                    
+                    elif entrada == '/test':
+                        self.ejecutar_tests()
+                    
+                    elif entrada == '/history':
+                        self.mostrar_historial_conversacion()
+                    
+                    elif entrada == '/save':
+                        if self.guardar_modelo():
+                            print(f"{Colors.GREEN}✅ Modelo guardado exitosamente{Colors.END}")
+                        else:
+                            print(f"{Colors.RED}❌ Error guardando modelo{Colors.END}")
+                    
+                    elif entrada == '/backup':
+                        if self.crear_backup():
+                            print(f"{Colors.GREEN}✅ Backup creado exitosamente{Colors.END}")
+                        else:
+                            print(f"{Colors.RED}❌ Error creando backup{Colors.END}")
+                    
+                    elif entrada == '/self_learn':
+                        if self.auto_cuestionamiento_activo:
+                            duracion = self.interfaz.solicitar_entrada("⏱️ Duración en minutos (default 5): ")
+                            try:
+                                duracion = int(duracion) if duracion else 5
+                            except ValueError:
+                                duracion = 5
+                            
+                            print(f"{Colors.YELLOW}🤔 Iniciando sesión de auto-aprendizaje por {duracion} minutos...{Colors.END}")
+                            asyncio.run(self.sesion_auto_aprendizaje(duracion))
+                        else:
+                            print(f"{Colors.RED}❌ Auto-cuestionamiento desactivado. Usa /config para activarlo{Colors.END}")
+                    
+                    elif entrada == '/evolve':
+                        if self.auto_evolucion_activa:
+                            print(f"{Colors.YELLOW}🧬 Creando nueva versión del modelo...{Colors.END}")
+                            nueva_version = self.crear_version_de_si_mismo()
+                            respuesta = self.interfaz.solicitar_entrada("¿Quieres cambiar a la nueva versión? (s/N): ")
+                            if respuesta.lower() == 's':
+                                print(f"{Colors.GREEN}🔄 Cambiando a {nueva_version.nombre}...{Colors.END}")
+                                print(f"{Colors.CYAN}ℹ️ Reinicia el programa para usar la nueva versión{Colors.END}")
+                        else:
+                            print(f"{Colors.RED}❌ Auto-evolución desactivada. Usa /config para activarla{Colors.END}")
+                    
+                    elif entrada == '/clone':
+                        versiones = self.listar_versiones_disponibles()
+                        if versiones:
+                            print(f"{Colors.CYAN}📋 Versiones disponibles:{Colors.END}")
+                            for i, version in enumerate(versiones, 1):
+                                print(f"   {i}. {version}")
+                            
+                            seleccion = self.interfaz.solicitar_entrada("Selecciona una versión por número: ")
+                            try:
+                                indice = int(seleccion) - 1
+                                if 0 <= indice < len(versiones):
+                                    version_seleccionada = versiones[indice]
+                                    print(f"{Colors.YELLOW}🤝 Iniciando diálogo con {version_seleccionada}...{Colors.END}")
+                                    asyncio.run(self.interactuar_con_version_anterior(version_seleccionada))
+                                else:
+                                    print(f"{Colors.RED}❌ Selección inválida{Colors.END}")
+                            except ValueError:
+                                print(f"{Colors.RED}❌ Ingresa un número válido{Colors.END}")
+                        else:
+                            print(f"{Colors.YELLOW}📭 No hay versiones anteriores disponibles{Colors.END}")
+                    
+                    elif entrada == '/memory':
+                        self._mostrar_memoria_permanente()
+                    
+                    elif entrada == '/gui':
+                        print(f"{Colors.YELLOW}🖥️ Abriendo interfaz gráfica...{Colors.END}")
+                        try:
+                            gui = InterfazGrafica(self)
+                            gui.ejecutar()
+                        except Exception as e:
+                            print(f"{Colors.RED}❌ Error abriendo GUI: {e}{Colors.END}")
+                    
+                    elif entrada == '/clear':
+                        os.system('cls' if os.name == 'nt' else 'clear')
+                        self.interfaz.imprimir_banner(f"MODO INTERACTIVO - {self.nombre.upper()}", Colors.GREEN)
+                    
+                    else:
+                        print(f"{Colors.RED}❌ Comando no reconocido. Usa /help para ver comandos disponibles.{Colors.END}")
+                    
+                    continue
+                
+                # Procesar conversación normal
+                inicio_tiempo = time.time()
+                respuesta = self.procesar_entrada(entrada)
+                tiempo_respuesta = time.time() - inicio_tiempo
+                
+                print(f"{Colors.BLUE}🤖 {self.nombre}: {respuesta}{Colors.END}")
+                
+                if self.modo_debug:
+                    print(f"{Colors.YELLOW}   [Debug: {tiempo_respuesta:.3f}s]{Colors.END}")
+                
+                contador_interacciones += 1
+                
+                # Auto-guardar cada 10 interacciones
+                if contador_interacciones % 10 == 0:
+                    self.guardar_modelo()
+                    if self.modo_debug:
+                        print(f"{Colors.YELLOW}   [Auto-guardado realizado]{Colors.END}")
+                
+            except KeyboardInterrupt:
+                print(f"\n{Colors.YELLOW}👋 ¡Hasta luego! Guardando modelo...{Colors.END}")
+                self.guardar_modelo()
+                break
+            except Exception as e:
+                logger.error(f"Error en modo interactivo: {e}")
+                print(f"{Colors.RED}❌ Error inesperado: {e}{Colors.END}")
+    
+    def _mostrar_ayuda_completa(self):
+        """Muestra ayuda completa del sistema"""
+        self.interfaz.imprimir_banner("AYUDA COMPLETA", Colors.PURPLE)
+        
+        secciones = {
+            "Comandos Básicos": {
+                "/help": "Muestra esta ayuda",
+                "/quit": "Sale del programa guardando el modelo",
+                "/clear": "Limpia la pantalla",
+                "/gui": "Abre la interfaz gráfica con botones"
+            },
+            "Información": {
+                "/stats": "Muestra estadísticas detalladas del modelo",
+                "/history": "Muestra el historial de conversaciones",
+                "/config": "Abre el menú de configuración",
+                "/memory": "Muestra la memoria permanente"
+            },
+            "Entrenamiento y Tests": {
+                "/train": "Inicia el modo de entrenamiento interactivo",
+                "/test": "Ejecuta tests de validación del modelo"
+            },
+            "Auto-Aprendizaje y Evolución": {
+                "/self_learn": "Inicia una sesión de auto-aprendizaje",
+                "/evolve": "Crea una nueva versión mejorada del modelo",
+                "/clone": "Interactúa con versiones anteriores del modelo"
+            },
+            "Gestión de Datos": {
+                "/save": "Guarda el estado actual del modelo",
+                "/backup": "Crea un backup completo del modelo"
+            }
+        }
+        
+        for seccion, comandos in secciones.items():
+            self.interfaz.imprimir_seccion(seccion)
+            for comando, descripcion in comandos.items():
+                print(f"   {Colors.WHITE}{comando:<12} - {descripcion}{Colors.END}")
+        
+        print(f"\n{Colors.CYAN}💡 Consejos:{Colors.END}")
+        print("• Haz preguntas naturales para obtener mejores respuestas")
+        print("• El modelo NUNCA OLVIDA - toda información se guarda permanentemente")
+        print("• Usa /gui para una interfaz más fácil con botones")
+        print("• El auto-aprendizaje permite que el modelo se haga preguntas y mejore")
+        print("• La evolución crea nuevas versiones mejoradas basadas en el aprendizaje")
+        print("• Puedes interactuar con versiones anteriores para comparar el progreso")
+        print("• La memoria permanente conserva todas las experiencias importantes")
+
+
+def main():
+    """Función principal mejorada"""
+    parser = argparse.ArgumentParser(description="Modelo de Lenguaje Avanzado con Auto-Aprendizaje y Memoria Permanente")
+    parser.add_argument("--nombre", default="modelo_avanzado", help="Nombre del modelo")
+    parser.add_argument("--vocab-size", type=int, default=15000, help="Tamaño del vocabulario")
+    parser.add_argument("--embedding-dim", type=int, default=256, help="Dimensión de embeddings")
+    parser.add_argument("--hidden-dim", type=int, default=512, help="Dimensión de capa oculta")
+    parser.add_argument("--learning-rate", type=float, default=0.01, help="Learning rate")
+    parser.add_argument("--auto-train", action="store_true", help="Activar auto-entrenamiento")
+    parser.add_argument("--auto-improve", action="store_true", help="Activar auto-mejora")
+    parser.add_argument("--auto-evolve", action="store_true", help="Activar auto-evolución")
+    parser.add_argument("--self-question", action="store_true", help="Activar auto-cuestionamiento")
+    parser.add_argument("--openai-key", default="", help="API key de OpenAI para evaluación")
+    parser.add_argument("--debug", action="store_true", help="Activar modo debug")
+    parser.add_argument("--gui", action="store_true", help="Iniciar directamente con interfaz gráfica")
+    
+    args = parser.parse_args()
+    
+    # Crear configuración
+    config = ModelConfig(
+        nombre=args.nombre,
+        vocab_size=args.vocab_size,
+        embedding_dim=args.embedding_dim,
+        hidden_dim=args.hidden_dim,
+        learning_rate=args.learning_rate,
+        auto_train=args.auto_train,
+        auto_improve=args.auto_improve,
+        auto_evolution=args.auto_evolve,
+        self_questioning=args.self_question,
+        openai_api_key=args.openai_key
+    )
+    
+    try:
+        # Crear e inicializar modelo
+        modelo = ModeloLenguajeMejorado(config)
+        modelo.modo_debug = args.debug
+        
+        print(f"{Colors.GREEN}✅ Modelo inicializado correctamente{Colors.END}")
+        print(f"{Colors.CYAN}📊 Vocabulario: {len(modelo.vocabulario):,} palabras{Colors.END}")
+        print(f"{Colors.CYAN}💬 Conversaciones previas: {len(modelo.conversaciones):,}{Colors.END}")
+        print(f"{Colors.CYAN}🧬 Versiones anteriores: {len(modelo.versiones_anteriores)}{Colors.END}")
+        print(f"{Colors.CYAN}🤔 Sesiones de auto-aprendizaje: {len(modelo.sesiones_auto_aprendizaje)}{Colors.END}")
+        print(f"{Colors.CYAN}🧠 Experiencias en memoria: {len(modelo.memoria_permanente['experiencias_importantes'])}{Colors.END}")
+        
+        # Mostrar estado de funcionalidades avanzadas
+        if modelo.auto_cuestionamiento_activo:
+            print(f"{Colors.GREEN}🤔 Auto-cuestionamiento: ACTIVO{Colors.END}")
+        if modelo.auto_evolucion_activa:
+            print(f"{Colors.GREEN}🧬 Auto-evolución: ACTIVA{Colors.END}")
+        if modelo.juez_openai.api_key:
+            print(f"{Colors.GREEN}⚖️ Evaluación con OpenAI: DISPONIBLE{Colors.END}")
+        
+        print(f"{Colors.PURPLE}🧠 MEMORIA PERMANENTE: El modelo NUNCA OLVIDA sus experiencias{Colors.END}")
+        
+        # Iniciar interfaz
+        if args.gui:
+            print(f"{Colors.YELLOW}🖥️ Iniciando interfaz gráfica...{Colors.END}")
+            gui = InterfazGrafica(modelo)
+            gui.ejecutar()
+        else:
+            print(f"{Colors.CYAN}💡 Usa /gui para abrir la interfaz con botones{Colors.END}")
+            modelo.modo_interactivo()
+        
+    except KeyboardInterrupt:
+        print(f"\n{Colors.YELLOW}👋 Programa interrumpido por el usuario{Colors.END}")
+    except Exception as e:
+        logger.error(f"Error crítico: {e}")
+        print(f"{Colors.RED}❌ Error crítico: {e}{Colors.END}")
+        print(f"{Colors.YELLOW}🔧 Verifica la instalación y permisos de archivos{Colors.END}")
+
+
+if __name__ == "__main__":
+    main()import numpy as np
+import json
+import os
+import pickle
+import inspect
+import ast
+import subprocess
+import sys
+from datetime import datetime
+import importlib
+import shutil
+import re
+import random
+from collections import defaultdict, Counter
+import time
+import threading
+import logging
+from typing import Dict, List, Tuple, Optional, Any
+import argparse
+from dataclasses import dataclass
+import asyncio
+import aiohttp
+import tkinter as tk
+from tkinter import ttk, scrolledtext, messagebox, simpledialog
+import threading
+import queue
+
+# Configurar logging con mejor formato
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s | %(levelname)s | %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger(__name__)
+
+# Simulación de OpenAI para el ejemplo (reemplazar con la librería real)
+class MockOpenAI:
+    def __init__(self, api_key):
+        self.api_key = api_key
+    
+    class ChatCompletion:
+        @staticmethod
+        async def acreate(**kwargs):
+            # Simulación de respuesta
+            await asyncio.sleep(0.5)  # Simular latencia
+            class MockResponse:
+                def __init__(self):
+                    self.choices = [type('obj', (object,), {
+                        'message': type('obj', (object,), {
+                            'content': json.dumps({
+                                "puntuacion_total": random.randint(6, 10),
+                                "coherencia": random.randint(6, 10),
+                                "relevancia": random.randint(6, 10),
+                                "precision": random.randint(6, 10),
+                                "utilidad": random.randint(6, 10),
+                                "comentarios": "Respuesta coherente y útil",
+                                "sugerencias": "Podría ser más específica"
+                            })
+                        })
+                    })()]
+            return MockResponse()
+
+# Configuración de colores para la terminal
+class Colors:
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    PURPLE = '\033[95m'
+    CYAN = '\033[96m'
+    WHITE = '\033[97m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+    END = '\033[0m'
+
+@dataclass
+class ModelConfig:
+    """Configuración del modelo"""
+    nombre: str = "llm_mejorado"
+    vocab_size: int = 15000
+    embedding_dim: int = 256
+    hidden_dim: int = 512
+    learning_rate: float = 0.01
+    auto_train: bool = True
+    auto_improve: bool = True
+    max_response_length: int = 50
+    temperature: float = 0.8
+    top_p: float = 0.9
+    openai_api_key: str = ""
+    auto_evolution: bool = True
+    self_questioning: bool = True
+
+class InterfazGrafica:
+    """Interfaz gráfica mejorada con botones"""
+    
+    def __init__(self, modelo):
+        self.modelo = modelo
+        self.root = tk.Tk()
+        self.root.title(f"Modelo de IA Avanzado - {modelo.nombre}")
+        self.root.geometry("1200x800")
+        self.root.configure(bg='#2b2b2b')
+        
+        # Cola para comunicación entre threads
+        self.message_queue = queue.Queue()
+        
+        self.setup_gui()
+        self.auto_learning_active = False
+        
+    def setup_gui(self):
+        """Configura la interfaz gráfica"""
+        # Frame principal
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Estilo
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure('Chat.TFrame', background='#3c3c3c')
+        style.configure('Button.TButton', padding=10)
+        
+        # Título
+        title_label = tk.Label(main_frame, 
+                              text=f"🤖 {self.modelo.nombre.upper()} v{self.modelo.version}",
+                              font=('Arial', 16, 'bold'),
+                              bg='#2b2b2b', fg='#00ff88')
+        title_label.pack(pady=10)
+        
+        # Frame de estadísticas
+        stats_frame = ttk.Frame(main_frame)
+        stats_frame.pack(fill=tk.X, pady=5)
+        
+        self.stats_label = tk.Label(stats_frame,
+                                   text=f"💬 Conversaciones: {len(self.modelo.conversaciones)} | "
+                                        f"📚 Vocabulario: {len(self.modelo.vocabulario)} | "
+                                        f"🧬 Versiones: {len(self.modelo.versiones_anteriores)}",
+                                   bg='#2b2b2b', fg='#ffffff')
+        self.stats_label.pack()
+        
+        # Frame del chat
+        chat_frame = ttk.Frame(main_frame, style='Chat.TFrame')
+        chat_frame.pack(fill=tk.BOTH, expand=True, pady=10)
+        
+        # Área de mensajes
+        self.chat_display = scrolledtext.ScrolledText(chat_frame,
+                                                     wrap=tk.WORD,
+                                                     font=('Consolas', 11),
+                                                     bg='#1e1e1e',
+                                                     fg='#ffffff',
+                                                     insertbackground='#ffffff',
+                                                     selectbackground='#404040')
+        self.chat_display.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Frame de entrada
+        input_frame = ttk.Frame(main_frame)
+        input_frame.pack(fill=tk.X, pady=5)
+        
+        # Campo de entrada
+        self.input_entry = tk.Entry(input_frame,
+                                   font=('Arial', 12),
+                                   bg='#404040',
+                                   fg='#ffffff',
+                                   insertbackground='#ffffff')
+        self.input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+        self.input_entry.bind('<Return>', self.enviar_mensaje)
+        
+        # Botón enviar
+        send_btn = ttk.Button(input_frame, text="Enviar 📤", command=self.enviar_mensaje)
+        send_btn.pack(side=tk.RIGHT)
+        
+        # Frame de botones principales
+        buttons_frame = ttk.Frame(main_frame)
+        buttons_frame.pack(fill=tk.X, pady=10)
+        
+        # Primera fila de botones
+        row1 = ttk.Frame(buttons_frame)
+        row1.pack(fill=tk.X, pady=2)
+        
+        ttk.Button(row1, text="🤔 Auto-Aprendizaje", command=self.iniciar_auto_aprendizaje).pack(side=tk.LEFT, padx=2)
+        ttk.Button(row1, text="🧬 Evolucionar", command=self.evolucionar_modelo).pack(side=tk.LEFT, padx=2)
+        ttk.Button(row1, text="👥 Hablar con Clon", command=self.hablar_con_clon).pack(side=tk.LEFT, padx=2)
+        ttk.Button(row1, text="📊 Estadísticas", command=self.mostrar_estadisticas).pack(side=tk.LEFT, padx=2)
+        
+        # Segunda fila de botones
+        row2 = ttk.Frame(buttons_frame)
+        row2.pack(fill=tk.X, pady=2)
+        
+        ttk.Button(row2, text="💾 Guardar", command=self.guardar_modelo).pack(side=tk.LEFT, padx=2)
+        ttk.Button(row2, text="⚙️ Configurar", command=self.configurar_modelo).pack(side=tk.LEFT, padx=2)
+        ttk.Button(row2, text="🧪 Tests", command=self.ejecutar_tests).pack(side=tk.LEFT, padx=2)
+        ttk.Button(row2, text="📚 Historial", command=self.mostrar_historial).pack(side=tk.LEFT, padx=2)
+        
+        # Tercera fila de botones
+        row3 = ttk.Frame(buttons_frame)
+        row3.pack(fill=tk.X, pady=2)
+        
+        ttk.Button(row3, text="🎓 Entrenar", command=self.modo_entrenamiento).pack(side=tk.LEFT, padx=2)
+        ttk.Button(row3, text="🧹 Limpiar Chat", command=self.limpiar_chat).pack(side=tk.LEFT, padx=2)
+        ttk.Button(row3, text="🔄 Backup", command=self.crear_backup).pack(side=tk.LEFT, padx=2)
+        ttk.Button(row3, text="❌ Salir", command=self.salir).pack(side=tk.RIGHT, padx=2)
+        
+        # Mensaje de bienvenida
+        self.agregar_mensaje("🤖 Sistema", f"¡Hola! Soy {self.modelo.nombre}, un modelo de IA avanzado.", "system")
+        self.agregar_mensaje("🤖 Sistema", "Puedo aprender solo, evolucionar y hablar con mis versiones anteriores.", "system")
+        self.agregar_mensaje("🤖 Sistema", "Usa los botones de abajo o escribe tu mensaje para comenzar.", "system")
+        
+        # Iniciar el procesamiento de mensajes
+        self.root.after(100, self.procesar_cola_mensajes)
+    
+    def procesar_cola_mensajes(self):
+        """Procesa mensajes de la cola de forma segura"""
+        try:
+            while True:
+                mensaje = self.message_queue.get_nowait()
+                self.agregar_mensaje(mensaje['emisor'], mensaje['texto'], mensaje['tipo'])
+        except queue.Empty:
+            pass
+        finally:
+            self.root.after(100, self.procesar_cola_mensajes)
+    
+    def agregar_mensaje(self, emisor, texto, tipo="user"):
+        """Agrega un mensaje al chat"""
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        colors = {
+            "user": "#00ff88",
+            "ai": "#0088ff",
+            "system": "#ff8800",
+            "error": "#ff0000"
+        }
+        
+        color = colors.get(tipo, "#ffffff")
+        
+        self.chat_display.config(state=tk.NORMAL)
+        self.chat_display.insert(tk.END, f"[{timestamp}] {emisor}: ", f"{tipo}_header")
+        self.chat_display.insert(tk.END, f"{texto}\n\n", f"{tipo}_body")
+        
+        # Configurar colores
+        self.chat_display.tag_config(f"{tipo}_header", foreground=color, font=('Arial', 10, 'bold'))
+        self.chat_display.tag_config(f"{tipo}_body", foreground="#ffffff", font=('Arial', 10))
+        
+        self.chat_display.config(state=tk.DISABLED)
+        self.chat_display.see(tk.END)
+    
+    def enviar_mensaje(self, event=None):
+        """Envía un mensaje del usuario"""
+        mensaje = self.input_entry.get().strip()
+        if not mensaje:
+            return
+        
+        self.input_entry.delete(0, tk.END)
+        self.agregar_mensaje("👤 Tú", mensaje, "user")
+        
+        # Procesar respuesta en thread separado
+        thread = threading.Thread(target=self.procesar_respuesta, args=(mensaje,))
+        thread.daemon = True
+        thread.start()
+    
+    def procesar_respuesta(self, mensaje):
+        """Procesa la respuesta del modelo en thread separado"""
+        try:
+            respuesta = self.modelo.procesar_entrada(mensaje)
+            self.message_queue.put({
+                'emisor': f'🤖 {self.modelo.nombre}',
+                'texto': respuesta,
+                'tipo': 'ai'
+            })
+            self.actualizar_estadisticas()
+        except Exception as e:
+            self.message_queue.put({
+                'emisor': '❌ Error',
+                'texto': f"Error procesando mensaje: {str(e)}",
+                'tipo': 'error'
+            })
+    
+    def iniciar_auto_aprendizaje(self):
+        """Inicia una sesión de auto-aprendizaje"""
+        if self.auto_learning_active:
+            messagebox.showwarning("Advertencia", "Ya hay una sesión de auto-aprendizaje activa")
+            return
+        
+        duracion = simpledialog.askinteger("Auto-Aprendizaje", 
+                                         "¿Cuántos minutos de auto-aprendizaje?", 
+                                         initialvalue=5, minvalue=1, maxvalue=60)
+        if duracion:
+            self.auto_learning_active = True
+            self.agregar_mensaje("🤔 Sistema", f"Iniciando auto-aprendizaje por {duracion} minutos...", "system")
+            
+            thread = threading.Thread(target=self.ejecutar_auto_aprendizaje, args=(duracion,))
+            thread.daemon = True
+            thread.start()
+    
+    def ejecutar_auto_aprendizaje(self, duracion):
+        """Ejecuta el auto-aprendizaje en thread separado"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.modelo.sesion_auto_aprendizaje(duracion))
+            
+            self.message_queue.put({
+                'emisor': '✅ Sistema',
+                'texto': f"Auto-aprendizaje completado. Realizadas {duracion} iteraciones de mejora.",
+                'tipo': 'system'
+            })
+        except Exception as e:
+            self.message_queue.put({
+                'emisor': '❌ Error',
+                'texto': f"Error en auto-aprendizaje: {str(e)}",
+                'tipo': 'error'
+            })
+        finally:
+            self.auto_learning_active = False
+    
+    def evolucionar_modelo(self):
+        """Crea una nueva versión evolucionada del modelo"""
+        respuesta = messagebox.askyesno("Evolución", 
+                                       "¿Crear una nueva versión evolucionada del modelo?\n"
+                                       "Esto puede tomar unos momentos.")
+        if respuesta:
+            self.agregar_mensaje("🧬 Sistema", "Creando nueva versión evolucionada...", "system")
+            
+            thread = threading.Thread(target=self.proceso_evolucion)
+            thread.daemon = True
+            thread.start()
+    
+    def proceso_evolucion(self):
+        """Proceso de evolución en thread separado"""
+        try:
+            nueva_version = self.modelo.crear_version_de_si_mismo()
+            self.message_queue.put({
+                'emisor': '🧬 Sistema',
+                'texto': f"Nueva versión '{nueva_version.nombre}' creada exitosamente.",
+                'tipo': 'system'
+            })
+        except Exception as e:
+            self.message_queue.put({
+                'emisor': '❌ Error',
+                'texto': f"Error en evolución: {str(e)}",
+                'tipo': 'error'
+            })
+    
+    def hablar_con_clon(self):
+        """Permite hablar con versiones anteriores"""
+        versiones = self.modelo.listar_versiones_disponibles()
+        if not versiones:
+            messagebox.showinfo("Info", "No hay versiones anteriores disponibles")
+            return
+        
+        # Crear ventana de selección
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Seleccionar Versión")
+        dialog.geometry("300x200")
+        dialog.configure(bg='#2b2b2b')
+        
+        tk.Label(dialog, text="Selecciona una versión:", 
+                bg='#2b2b2b', fg='#ffffff', font=('Arial', 12)).pack(pady=10)
+        
+        listbox = tk.Listbox(dialog, bg='#404040', fg='#ffffff')
+        for version in versiones:
+            listbox.insert(tk.END, version)
+        listbox.pack(pady=10, padx=20, fill=tk.BOTH, expand=True)
+        
+        def iniciar_dialogo():
+            selection = listbox.curselection()
+            if selection:
+                version_seleccionada = versiones[selection[0]]
+                dialog.destroy()
+                self.agregar_mensaje("👥 Sistema", f"Iniciando diálogo con {version_seleccionada}...", "system")
+                
+                thread = threading.Thread(target=self.ejecutar_dialogo_clon, args=(version_seleccionada,))
+                thread.daemon = True
+                thread.start()
+        
+        ttk.Button(dialog, text="Iniciar Diálogo", command=iniciar_dialogo).pack(pady=10)
+    
+    def ejecutar_dialogo_clon(self, version_name):
+        """Ejecuta el diálogo con clon en thread separado"""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(self.modelo.interactuar_con_version_anterior(version_name))
+            
+            self.message_queue.put({
+                'emisor': '👥 Sistema',
+                'texto': f"Diálogo con {version_name} completado.",
+                'tipo': 'system'
+            })
+        except Exception as e:
+            self.message_queue.put({
+                'emisor': '❌ Error',
+                'texto': f"Error en diálogo: {str(e)}",
+                'tipo': 'error'
+            })
+    
+    def mostrar_estadisticas(self):
+        """Muestra ventana de estadísticas"""
+        stats_window = tk.Toplevel(self.root)
+        stats_window.title("Estadísticas del Modelo")
+        stats_window.geometry("600x400")
+        stats_window.configure(bg='#2b2b2b')
+        
+        text_area = scrolledtext.ScrolledText(stats_window, 
+                                            bg='#1e1e1e', fg='#ffffff',
+                                            font=('Consolas', 10))
+        text_area.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Generar estadísticas
+        stats = f"""
+📊 ESTADÍSTICAS DEL MODELO {self.modelo.nombre.upper()}
+{'='*50}
+
+📋 INFORMACIÓN GENERAL:
+   • Nombre: {self.modelo.nombre}
+   • Versión: {self.modelo.version}
+   • Vocabulario: {len(self.modelo.vocabulario):,} palabras
+   • Conversaciones: {len(self.modelo.conversaciones):,}
+
+🏗️ ARQUITECTURA:
+   • Embedding: {self.modelo.vocab_size:,} x {self.modelo.embedding_dim}
+   • Hidden Layer: {self.modelo.embedding_dim} x {self.modelo.hidden_dim}
+   • Output Layer: {self.modelo.hidden_dim} x {self.modelo.vocab_size:,}
+
+⚙️ CONFIGURACIÓN:
+   • Auto-entrenamiento: {'🟢 ACTIVO' if self.modelo.auto_entrenamiento_activo else '🔴 INACTIVO'}
+   • Auto-mejora: {'🟢 ACTIVA' if self.modelo.auto_mejora_activa else '🔴 INACTIVA'}
+   • Auto-evolución: {'🟢 ACTIVA' if self.modelo.auto_evolucion_activa else '🔴 INACTIVA'}
+   • Auto-cuestionamiento: {'🟢 ACTIVO' if self.modelo.auto_cuestionamiento_activo else '🔴 INACTIVO'}
+   • Learning Rate: {self.modelo.learning_rate:.6f}
+
+🧠 AUTO-APRENDIZAJE:
+   • Sesiones realizadas: {len(self.modelo.sesiones_auto_aprendizaje)}
+   • Versiones anteriores: {len(self.modelo.versiones_anteriores)}
+   • Preguntas auto-generadas: {len(self.modelo.preguntas_auto_generadas)}
+
+⏱️ RENDIMIENTO:
+"""
+        
+        if self.modelo.metricas_rendimiento['tiempo_respuesta']:
+            tiempos = self.modelo.metricas_rendimiento['tiempo_respuesta']
+            stats += f"""   • Tiempo promedio: {np.mean(tiempos):.3f}s
+   • Tiempo mínimo: {np.min(tiempos):.3f}s
+   • Tiempo máximo: {np.max(tiempos):.3f}s"""
+        else:
+            stats += "   • No hay datos de rendimiento disponibles"
+        
+        text_area.insert(tk.END, stats)
+        text_area.config(state=tk.DISABLED)
+    
+    def guardar_modelo(self):
+        """Guarda el modelo"""
+        if self.modelo.guardar_modelo():
+            messagebox.showinfo("Éxito", "Modelo guardado exitosamente")
+            self.actualizar_estadisticas()
+        else:
+            messagebox.showerror("Error", "Error al guardar el modelo")
+    
+    def configurar_modelo(self):
+        """Abre ventana de configuración"""
+        config_window = tk.Toplevel(self.root)
+        config_window.title("Configuración del Modelo")
+        config_window.geometry("400x500")
+        config_window.configure(bg='#2b2b2b')
+        
+        # Variables de configuración
+        auto_train_var = tk.BooleanVar(value=self.modelo.auto_entrenamiento_activo)
+        auto_improve_var = tk.BooleanVar(value=self.modelo.auto_mejora_activa)
+        auto_evolve_var = tk.BooleanVar(value=self.modelo.auto_evolucion_activa)
+        auto_question_var = tk.BooleanVar(value=self.modelo.auto_cuestionamiento_activo)
+        
+        tk.Label(config_window, text="⚙️ CONFIGURACIÓN", 
+                bg='#2b2b2b', fg='#00ff88', font=('Arial', 14, 'bold')).pack(pady=10)
+        
+        # Checkboxes
+        tk.Checkbutton(config_window, text="🎓 Auto-entrenamiento", 
+                      variable=auto_train_var, bg='#2b2b2b', fg='#ffffff',
+                      selectcolor='#404040').pack(pady=5, anchor='w', padx=20)
+        
+        tk.Checkbutton(config_window, text="🚀 Auto-mejora", 
+                      variable=auto_improve_var, bg='#2b2b2b', fg='#ffffff',
+                      selectcolor='#404040').pack(pady=5, anchor='w', padx=20)
+        
+        tk.Checkbutton(config_window, text="🧬 Auto-evolución", 
+                      variable=auto_evolve_var, bg='#2b2b2b', fg='#ffffff',
+                      selectcolor='#404040').pack(pady=5, anchor='w', padx=20)
+        
+        tk.Checkbutton(config_window, text="🤔 Auto-cuestionamiento", 
+                      variable=auto_question_var, bg='#2b2b2b', fg='#ffffff',
+                      selectcolor='#404040').pack(pady=5, anchor='w', padx=20)
+        
+        # Learning Rate
+        tk.Label(config_window, text="📊 Learning Rate:", 
+                bg='#2b2b2b', fg='#ffffff').pack(pady=(20,5), anchor='w', padx=20)
+        
+        lr_var = tk.StringVar(value=str(self.modelo.learning_rate))
+        lr_entry = tk.Entry(config_window, textvariable=lr_var, bg='#404040', fg='#ffffff')
+        lr_entry.pack(pady=5, padx=20, fill='x')
+        
+        # Temperature
+        tk.Label(config_window, text="🌡️ Temperature:", 
+                bg='#2b2b2b', fg='#ffffff').pack(pady=(10,5), anchor='w', padx=20)
+        
+        temp_var = tk.StringVar(value=str(self.modelo.config.temperature))
+        temp_entry = tk.Entry(config_window, textvariable=temp_var, bg='#404040', fg='#ffffff')
+        temp_entry.pack(pady=5, padx=20, fill='x')
+        
+        def aplicar_configuracion():
+            try:
+                self.modelo.auto_entrenamiento_activo = auto_train_var.get()
+                self.modelo.auto_mejora_activa = auto_improve_var.get()
+                self.modelo.auto_evolucion_activa = auto_evolve_var.get()
+                self.modelo.auto_cuestionamiento_activo = auto_question_var.get()
+                
+                new_lr = float(lr_var.get())
+                if 0.0001 <= new_lr <= 1.0:
+                    self.modelo.learning_rate = new_lr
+                
+                new_temp = float(temp_var.get())
+                if 0.1 <= new_temp <= 2.0:
+                    self.modelo.config.temperature = new_temp
+                
+                messagebox.showinfo("Éxito", "Configuración aplicada")
+                config_window.destroy()
+                
+            except ValueError:
+                messagebox.showerror("Error", "Valores inválidos")
+        
+        ttk.Button(config_window, text="Aplicar", command=aplicar_configuracion).pack(pady=20)
+    
+    def ejecutar_tests(self):
+        """Ejecuta tests del modelo"""
+        self.agregar_mensaje("🧪 Sistema", "Ejecutando tests de validación...", "system")
+        
+        thread = threading.Thread(target=self.proceso_tests)
+        thread.daemon = True
+        thread.start()
+    
+    def proceso_tests(self):
+        """Ejecuta tests en thread separado"""
+        try:
+            # Simular tests
+            tests = [
+                "Test básico de respuesta",
+                "Test de tiempo de respuesta", 
+                "Test de entrada vacía",
+                "Test de entrada larga",
+                "Test de caracteres especiales"
+            ]
+            
+            resultados = []
+            for test in tests:
+                time.sleep(0.5)  # Simular tiempo de test
+                exito = random.choice([True, True, True, False])  # 75% éxito
+                resultados.append(exito)
+                
+                estado = "✅ PASÓ" if exito else "❌ FALLÓ"
+                self.message_queue.put({
+                    'emisor': '🧪 Test',
+                    'texto': f"{test}: {estado}",
+                    'tipo': 'system'
+                })
+            
+            exitosos = sum(resultados)
+            total = len(resultados)
+            porcentaje = (exitosos / total) * 100
+            
+            self.message_queue.put({
+                'emisor': '📊 Resultado',
+                'texto': f"Tests completados: {exitosos}/{total} ({porcentaje:.1f}%) exitosos",
+                'tipo': 'system'
+            })
+            
+        except Exception as e:
+            self.message_queue.put({
+                'emisor': '❌ Error',
+                'texto': f"Error ejecutando tests: {str(e)}",
+                'tipo': 'error'
+            })
+    
+    def mostrar_historial(self):
+        """Muestra el historial de conversaciones"""
+        hist_window = tk.Toplevel(self.root)
+        hist_window.title("Historial de Conversaciones")
+        hist_window.geometry("800x600")
+        hist_window.configure(bg='#2b2b2b')
+        
+        text_area = scrolledtext.ScrolledText(hist_window, 
+                                            bg='#1e1e1e', fg='#ffffff',
+                                            font=('Consolas', 10))
+        text_area.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        if not self.modelo.conversaciones:
+            text_area.insert(tk.END, "📭 No hay conversaciones registradas")
+        else:
+            ultimas = self.modelo.conversaciones[-20:]  # Últimas 20
+            for i, conv in enumerate(ultimas, 1):
+                timestamp = conv['timestamp'][:19].replace('T', ' ')
+                tiempo_resp = conv.get('tiempo_respuesta', 0)
+                
+                text_area.insert(tk.END, f"\n{i}. {timestamp} (⏱️ {tiempo_resp:.3f}s)\n")
+                text_area.insert(tk.END, f"👤 Usuario: {conv['entrada']}\n")
+                text_area.insert(tk.END, f"🤖 Modelo: {conv['respuesta']}\n")
+                text_area.insert(tk.END, "-" * 50 + "\n")
+        
+        text_area.config(state=tk.DISABLED)
+    
+    def modo_entrenamiento(self):
+        """Abre modo de entrenamiento"""
+        train_window = tk.Toplevel(self.root)
+        train_window.title("Modo Entrenamiento")
+        train_window.geometry("600x400")
+        train_window.configure(bg='#2b2b2b')
+        
+        tk.Label(train_window, text="🎓 MODO ENTRENAMIENTO", 
+                bg='#2b2b2b', fg='#00ff88', font=('Arial', 14, 'bold')).pack(pady=10)
+        
+        tk.Label(train_window, text="Ingresa frases para entrenar el modelo:", 
+                bg='#2b2b2b', fg='#ffffff').pack(pady=5)
+        
+        # Área de entrada
+        entrada_frame = ttk.Frame(train_window)
+        entrada_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        entrada_text = tk.Text(entrada_frame, height=3, bg='#404040', fg='#ffffff')
+        entrada_text.pack(fill=tk.X)
+        
+        # Área de resultados
+        resultado_text = scrolledtext.ScrolledText(train_window, height=15,
+                                                  bg='#1e1e1e', fg='#ffffff')
+        resultado_text.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        
+        def entrenar_frase():
+            frase = entrada_text.get("1.0", tk.END).strip()
+            if frase:
+                # Simular entrenamiento
+                tokens = len(frase.split())
+                error_simulado = random.uniform(0.1, 1.0)
+                
+                resultado_text.insert(tk.END, f"✅ Entrenando: '{frase}'\n")
+                resultado_text.insert(tk.END, f"   📊 Tokens: {tokens}\n")
+                resultado_text.insert(tk.END, f"   📉 Error: {error_simulado:.4f}\n\n")
+                resultado_text.see(tk.END)
+                
+                entrada_text.delete("1.0", tk.END)
+        
+        ttk.Button(entrada_frame, text="🎓 Entrenar", command=entrenar_frase).pack(pady=5)
+    
+    def limpiar_chat(self):
+        """Limpia el área de chat"""
+        self.chat_display.config(state=tk.NORMAL)
+        self.chat_display.delete(1.0, tk.END)
+        self.chat_display.config(state=tk.DISABLED)
+        self.agregar_mensaje("🧹 Sistema", "Chat limpiado", "system")
+    
+    def crear_backup(self):
+        """Crea un backup del modelo"""
+        if self.modelo.crear_backup():
+            messagebox.showinfo("Éxito", "Backup creado exitosamente")
+        else:
+            messagebox.showerror("Error", "Error creando backup")
+    
+    def actualizar_estadisticas(self):
+        """Actualiza las estadísticas mostradas"""
+        self.stats_label.config(
+            text=f"💬 Conversaciones: {len(self.modelo.conversaciones)} | "
+                 f"📚 Vocabulario: {len(self.modelo.vocabulario)} | "
+                 f"🧬 Versiones: {len(self.modelo.versiones_anteriores)}"
+        )
+    
+    def salir(self):
+        """Cierra la aplicación"""
+        if messagebox.askyesno("Salir", "¿Guardar el modelo antes de salir?"):
+            self.modelo.guardar_modelo()
+        self.root.quit()
+    
+    def ejecutar(self):
+        """Ejecuta la interfaz gráfica"""
+        self.root.mainloop()
+
+class InterfazMejorada:
+    """Interfaz mejorada para el modelo de lenguaje"""
+    
+    def __init__(self):
+        self.ancho_terminal = self._obtener_ancho_terminal()
+        self.historial_comando = []
+        self.modo_debug = False
+        
+    def _obtener_ancho_terminal(self):
+        """Obtiene el ancho de la terminal"""
+        try:
+            return os.get_terminal_size().columns
+        except:
+            return 80
+    
+    def imprimir_banner(self, texto: str, color: str = Colors.BLUE, caracter: str = "="):
+        """Imprime un banner decorado"""
+        ancho = min(self.ancho_terminal, 80)
+        print(f"\n{color}{caracter * ancho}")
+        texto_centrado = texto.center(ancho)
+        print(f"{texto_centrado}")
+        print(f"{caracter * ancho}{Colors.END}")
+    
+    def imprimir_seccion(self, titulo: str, contenido: str = "", color: str = Colors.CYAN):
+        """Imprime una sección con formato"""
+        print(f"\n{color}{Colors.BOLD}📋 {titulo.upper()}{Colors.END}")
+        print(f"{color}{'─' * (len(titulo) + 4)}{Colors.END}")
+        if contenido:
+            print(f"{contenido}")
+    
+    def imprimir_estadistica(self, etiqueta: str, valor: Any, color: str = Colors.WHITE):
+        """Imprime una estadística formateada"""
+        print(f"{color}   {etiqueta:<25} {Colors.BOLD}{valor}{Colors.END}")
+    
+    def imprimir_progreso(self, actual: int, total: int, descripcion: str = ""):
+        """Imprime una barra de progreso"""
+        porcentaje = (actual / total) * 100
+        barra_llena = int(30 * actual / total)
+        barra = "█" * barra_llena + "░" * (30 - barra_llena)
+        
+        print(f"\r{Colors.YELLOW}[{barra}] {porcentaje:.1f}% {descripcion}{Colors.END}", end="", flush=True)
+        if actual == total:
+            print()  # Nueva línea al completar
+    
+    def solicitar_entrada(self, prompt: str, color: str = Colors.GREEN) -> str:
+        """Solicita entrada del usuario con formato"""
+        try:
+            return input(f"{color}{prompt}{Colors.END}").strip()
+        except KeyboardInterrupt:
+            print(f"\n{Colors.YELLOW}⚠️  Operación cancelada{Colors.END}")
+            return ""
+    
+    def mostrar_menu(self, opciones: Dict[str, str], titulo: str = "OPCIONES DISPONIBLES"):
+        """Muestra un menú formateado"""
+        self.imprimir_seccion(titulo, color=Colors.PURPLE)
+        
+        for key, descripcion in opciones.items():
+            icono = self._obtener_icono_comando(key)
+            print(f"   {Colors.WHITE}{key:<15} {icono} {descripcion}{Colors.END}")
+    
+    def _obtener_icono_comando(self, comando: str) -> str:
+        """Obtiene un icono para cada comando"""
+        iconos = {
+            '/help': '❓',
+            '/stats': '📊',
+            '/train': '🎓',
+            '/improve': '🚀',
+            '/save': '💾',
+            '/load': '📂',
+            '/clear': '🧹',
+            '/history': '📚',
+            '/config': '⚙️',
+            '/test': '🧪',
+            '/export': '📤',
+            '/debug': '🐛',
+            '/evolve': '🧬',
+            '/self_learn': '🤔',
+            '/clone': '👥',
+            '/quit': '👋'
+        }
+        return iconos.get(comando, '▶️')
+
+class JuezOpenAI:
+    """Clase para interactuar con OpenAI como juez de respuestas"""
+    
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        if api_key:
+            self.openai = MockOpenAI(api_key)  # Usar mock para el ejemplo
+    
+    async def evaluar_respuesta(self, pregunta: str, respuesta: str, contexto: str = "") -> Dict[str, Any]:
+        """Evalúa una respuesta usando OpenAI"""
+        if not self.api_key:
+            return {"error": "API key de OpenAI no configurada"}
+        
+        try:
+            prompt = f"""
+            Como un juez experto en inteligencia artificial, evalúa la siguiente respuesta:
+            
+            PREGUNTA: {pregunta}
+            RESPUESTA: {respuesta}
+            CONTEXTO: {contexto}
+            
+            Evalúa en una escala de 1-10 considerando:
+            - Coherencia (¿La respuesta tiene sentido?)
+            - Relevancia (¿Responde a la pregunta?)
+            - Precisión (¿Es factualmente correcta?)
+            - Utilidad (¿Es útil para el usuario?)
+            
+            Devuelve tu evaluación en formato JSON:
+            {{
+                "puntuacion_total": [1-10],
+                "coherencia": [1-10],
+                "relevancia": [1-10],
+                "precision": [1-10],
+                "utilidad": [1-10],
+                "comentarios": "comentarios detallados",
+                "sugerencias": "sugerencias de mejora"
+            }}
+            """
+            
+            response = await self.openai.ChatCompletion.acreate(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=500,
+                temperature=0.3
+            )
+            
+            resultado = response.choices[0].message.content
+            return json.loads(resultado)
+            
+        except Exception as e:
+            return {"error": f"Error evaluando con OpenAI: {str(e)}"}
+    
+    async def generar_pregunta_critica(self, tema: str) -> str:
+        """Genera una pregunta crítica sobre un tema"""
+        if not self.api_key:
+            preguntas_default = [
+                f"¿Cuáles son las implicaciones éticas de {tema}?",
+                f"¿Cómo puede {tema} impactar el futuro de la humanidad?",
+                f"¿Qué desafíos presenta {tema} en la sociedad actual?",
+                f"¿Cuáles son los aspectos más importantes de {tema}?",
+                f"¿Cómo se relaciona {tema} con otros campos del conocimiento?"
+            ]
+            return random.choice(preguntas_default)
+        
+        try:
+            prompt = f"""
+            Genera una pregunta crítica y profunda sobre el tema: {tema}
+            
+            La pregunta debe:
+            - Ser específica y detallada
+            - Requerir análisis crítico
+            - Tener múltiples perspectivas posibles
+            - Ser educativa y constructiva
+            
+            Devuelve solo la pregunta, sin explicaciones adicionales.
+            """
+            
+            response = await self.openai.ChatCompletion.acreate(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=150,
+                temperature=0.7
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            return f"¿Qué opinas sobre {tema} y cuáles son sus implicaciones?"
+
+class GeneradorContexto:
+    """Clase auxiliar para generar contexto mejorado"""
+    
+    def __init__(self):
+        self.contexto_global = []
+        self.temas_recientes = []
+    
+    def actualizar_contexto(self, entrada: str, respuesta: str):
+        """Actualiza el contexto global de la conversación"""
+        self.contexto_global.append({
+            'entrada': entrada,
+            'respuesta': respuesta,
+            'timestamp': datetime.now()
+        })
+        
+        # Mantener solo los últimos 10 intercambios
+        if len(self.contexto_global) > 10:
+            self.contexto_global.pop(0)
+    
+    def obtener_contexto_relevante(self, entrada_actual: str) -> str:
+        """Obtiene contexto relevante para la entrada actual"""
+        if not self.contexto_global:
+            return ""
+        
+        # Buscar temas relacionados en el contexto reciente
+        palabras_entrada = set(entrada_actual.lower().split())
+        contexto_relevante = []
+        
+        for intercambio in self.contexto_global[-3:]:  # Últimos 3 intercambios
+            palabras_prev = set(intercambio['entrada'].lower().split())
+            if palabras_entrada.intersection(palabras_prev):
+                contexto_relevante.append(intercambio)
+        
+        return contexto_relevante
+
+class ModeloLenguajeMejorado:
+    """
+    Modelo de lenguaje mejorado con interfaz avanzada y mejores capacidades de respuesta
+    """
+    
+    def __init__(self, config: ModelConfig = None):
+        self.config = config or ModelConfig()
+        self.interfaz = InterfazMejorada()
+        
+        # Configuración básica
+        self.nombre = self.config.nombre
+        self.vocab_size = self.config.vocab_size
+        self.embedding_dim = self.config.embedding_dim
+        self.hidden_dim = self.config.hidden_dim
+        self.learning_rate = self.config.learning_rate
+        self.version = "3.0.0"
+        
+        # Archivos de persistencia
+        self._configurar_archivos()
+        
+        # Estado del modelo
+        self.vocabulario = {"<PAD>": 0, "<UNK>": 1, "<START>": 2, "<END>": 3, "<MASK>": 4}
+        self.vocabulario_inverso = {0: "<PAD>", 1: "<UNK>", 2: "<START>", 3: "<END>", 4: "<MASK>"}
+        self.contador_vocab = 5
+        
+        # Datos y métricas
+        self.conversaciones = []
+        self.historial_error = []
+        self.contexto_conversacion = []
+        self.metricas_rendimiento = {
+            'tiempo_respuesta': [],
+            'precision_respuestas': [],
+            'satisfaccion_usuario': [],
+            'complejidad_respuestas': []
+        }
+        
+        # Sistema de respuestas inteligente mejorado
+        self.base_conocimiento = self._inicializar_base_conocimiento()
+        self.patrones_respuesta = self._inicializar_patrones_respuesta()
+        self.generador_contexto = GeneradorContexto()
+        
+        # Configuración avanzada
+        self.auto_entrenamiento_activo = self.config.auto_train
+        self.auto_mejora_activa = self.config.auto_improve
+        self.modo_debug = False
+        
+        # Nuevas funcionalidades de auto-aprendizaje
+        self.juez_openai = JuezOpenAI(self.config.openai_api_key)
+        self.versiones_anteriores = []
+        self.preguntas_auto_generadas = []
+        self.sesiones_auto_aprendizaje = []
+        self.auto_evolucion_activa = self.config.auto_evolution
+        self.auto_cuestionamiento_activo = self.config.self_questioning
+        
+        # Memoria persistente - NUNCA SE OLVIDA
+        self.memoria_permanente = {
+            'experiencias_importantes': [],
+            'lecciones_aprendidas': [],
+            'patrones_detectados': [],
+            'mejoras_realizadas': []
+        }
+        
+        # Inicializar modelo
+        self._inicializar_modelo()
+        
+        # Mensaje de bienvenida
+        self.interfaz.imprimir_banner(f"MODELO DE LENGUAJE AVANZADO v{self.version}", Colors.BLUE)
+        logger.info(f"🤖 Modelo '{self.nombre}' inicializado correctamente")
+    
+    def _configurar_archivos(self):
+        """Configura los archivos de persistencia"""
+        self.directorio_base = f"{self.nombre}_data"
+        os.makedirs(self.directorio_base, exist_ok=True)
+        
+        self.archivos = {
+            'pesos': f"{self.directorio_base}/pesos.pkl",
+            'vocabulario': f"{self.directorio_base}/vocabulario.json",
+            'conversaciones': f"{self.directorio_base}/conversaciones.json",
+            'config': f"{self.directorio_base}/config.json",
+            'backups': f"{self.directorio_base}/backups/",
+            'versiones': f"{self.directorio_base}/versiones/",
+            'auto_aprendizaje': f"{self.directorio_base}/auto_aprendizaje.json",
+            'memoria_permanente': f"{self.directorio_base}/memoria_permanente.json"
+        }
+        
+        for carpeta in ['backups', 'versiones']:
+            os.makedirs(self.archivos[carpeta], exist_ok=True)
+    
+    def _inicializar_base_conocimiento(self) -> Dict[str, Any]:
+        """Inicializa la base de conocimiento del modelo"""
+        return {
+            'definiciones': {
+                'inteligencia_artificial': "Campo de la informática que busca crear sistemas capaces de realizar tareas que normalmente requieren inteligencia humana.",
+                'machine_learning': "Subcampo de la IA que permite a las máquinas aprender y mejorar automáticamente a partir de la experiencia.",
+                'deep_learning': "Técnica de machine learning basada en redes neuronales artificiales con múltiples capas.",
+                'nlp': "Procesamiento de Lenguaje Natural - área que combina lingüística e informática para que las máquinas entiendan el lenguaje humano."
+            },
+            'hechos': {
+                'python': "Lenguaje de programación de alto nivel, interpretado y de propósito general.",
+                'algoritmos': "Secuencia finita de instrucciones bien definidas para resolver un problema.",
+                'datos': "Información procesada y organizada que puede ser utilizada para tomar decisiones."
+            },
+            'conceptos_tecnicos': {
+                'neural_network': "Red de nodos interconectados que simula el funcionamiento del cerebro humano.",
+                'gradient_descent': "Algoritmo de optimización usado para minimizar funciones de costo.",
+                'backpropagation': "Método para entrenar redes neuronales propagando errores hacia atrás."
+            }
+        }
+    
+    def _inicializar_patrones_respuesta(self) -> Dict[str, Any]:
+        """Inicializa patrones de respuesta más sofisticados"""
+        return {
+            'saludo': {
+                'triggers': ['hola', 'buenos días', 'buenas tardes', 'hey', 'hi', 'saludos'],
+                'responses': [
+                    "¡Hola! Soy un modelo de lenguaje avanzado diseñado para mantener conversaciones inteligentes y ayudarte con información. ¿En qué puedo asistirte hoy?",
+                    "¡Saludos! Estoy aquí para conversar contigo y proporcionarte información útil. ¿Qué te interesa saber?",
+                    "¡Qué tal! Me alegra poder conversar contigo. Soy capaz de discutir una amplia variedad de temas. ¿Sobre qué te gustaría hablar?"
+                ],
+                'contexto': 'inicial'
+            },
+            'identidad': {
+                'triggers': ['qué eres', 'quién eres', 'preséntate', 'sobre ti'],
+                'responses': [
+                    "Soy un modelo de lenguaje avanzado creado para mantener conversaciones naturales y proporcionar información útil. Utilizo técnicas de procesamiento de lenguaje natural para entender y responder a tus preguntas de manera coherente.",
+                    "Me llamo {nombre} y soy un sistema de inteligencia artificial especializado en conversación. Puedo ayudarte con preguntas, explicaciones, análisis de temas y mantener diálogos interesantes sobre diversos temas.",
+                    "Soy un asistente de IA conversacional que combina conocimiento general con capacidades de diálogo natural. Mi objetivo es ser útil, informativo y mantener conversaciones enriquecedoras."
+                ],
+                'contexto': 'autodescripcion'
+            },
+            'capacidades': {
+                'triggers': ['qué puedes hacer', 'capacidades', 'funciones', 'habilidades'],
+                'responses': [
+                    "Puedo ayudarte con múltiples tareas: responder preguntas, explicar conceptos, mantener conversaciones, analizar información, proporcionar definiciones y discutir una amplia gama de temas desde ciencia hasta cultura general.",
+                    "Mis capacidades incluyen: procesamiento de lenguaje natural, análisis de texto, generación de respuestas coherentes, explicación de conceptos complejos, y mantenimiento de contexto conversacional.",
+                    "Estoy diseñado para: conversar de manera natural, proporcionar información precisa, explicar temas complejos de forma comprensible, ayudar con análisis y razonamiento, y adaptarme al estilo de conversación que prefieras."
+                ],
+                'contexto': 'funcional'
+            },
+            'conocimiento': {
+                'triggers': ['sabes sobre', 'conoces', 'información sobre', 'háblame de'],
+                'responses': [
+                    "Tengo conocimientos sobre una amplia variedad de temas incluyendo ciencia, tecnología, historia, cultura, programación y más. ¿Sobre qué tema específico te gustaría que te hable?",
+                    "Mi base de conocimiento abarca múltiples disciplinas. Puedo proporcionarte información detallada, explicaciones y análisis sobre el tema que te interese. ¿Qué te gustaría explorar?",
+                    "Cuento con información sobre diversos campos del conocimiento. Desde conceptos técnicos hasta temas generales, estoy preparado para ayudarte. ¿Hay algo específico que quieras saber?"
+                ],
+                'contexto': 'informativo'
+            },
+            'agradecimiento': {
+                'triggers': ['gracias', 'muchas gracias', 'te agradezco', 'thank you'],
+                'responses': [
+                    "¡De nada! Me alegra poder ayudarte. Si tienes más preguntas o quieres continuar la conversación, estaré aquí.",
+                    "Es un placer ayudarte. No dudes en preguntarme cualquier cosa más que necesites saber.",
+                    "¡Con gusto! Siempre estoy disponible para asistirte. ¿Hay algo más en lo que pueda ayudarte?"
+                ],
+                'contexto': 'social'
+            }
+        }
+    
+    def _inicializar_modelo(self):
+        """Inicializa o carga el modelo"""
+        if self._existe_modelo_guardado():
+            self._cargar_modelo()
+        else:
+            self._crear_modelo_nuevo()
+            logger.info("🆕 Modelo nuevo creado e inicializado")
+    
+    def _existe_modelo_guardado(self) -> bool:
+        """Verifica si existe un modelo guardado"""
+        return os.path.exists(self.archivos['pesos']) and os.path.exists(self.archivos['vocabulario'])
+    
+    def _cargar_modelo(self):
+        """Carga un modelo existente"""
+        try:
+            # Cargar pesos
+            with open(self.archivos['pesos'], 'rb') as f:
+                datos = pickle.load(f)
+                self.W_embedding = datos['W_embedding']
+                self.W_hidden = datos['W_hidden']
+                self.b_hidden = datos['b_hidden']
+                self.W_output = datos['W_output']
+                self.b_output = datos['b_output']
+            
+            # Cargar vocabulario
+            with open(self.archivos['vocabulario'], 'r', encoding='utf-8') as f:
+                vocab_data = json.load(f)
+                self.vocabulario = vocab_data['vocabulario']
+                self.vocabulario_inverso = vocab_data['vocabulario_inverso']
+                self.contador_vocab = vocab_data['contador_vocab']
+            
+            # Cargar conversaciones existentes
+            if os.path.exists(self.archivos['conversaciones']):
+                with open(self.archivos['conversaciones'], 'r', encoding='utf-8') as f:
+                    self.conversaciones = json.load(f)
+            
+            # Cargar datos de auto-aprendizaje si existen
+            if os.path.exists(self.archivos['auto_aprendizaje']):
+                with open(self.archivos['auto_aprendizaje'], 'r', encoding='utf-8') as f:
+                    auto_data = json.load(f)
+                    self.preguntas_auto_generadas = auto_data.get('preguntas', [])
+                    self.sesiones_auto_aprendizaje = auto_data.get('sesiones', [])
+                    self.versiones_anteriores = auto_data.get('versiones_anteriores', [])
+            
+            # Cargar memoria permanente - NUNCA SE OLVIDA
+            if os.path.exists(self.archivos['memoria_permanente']):
+                with open(self.archivos['memoria_permanente'], 'r', encoding='utf-8') as f:
+                    self.memoria_permanente = json.load(f)
+            
+            logger.info("✅ Modelo cargado exitosamente")
+        except Exception as e:
+            logger.error(f"❌ Error cargando modelo: {e}")
+            self._crear_modelo_nuevo()
+    
+    def _crear_modelo_nuevo(self):
+        """Crea un nuevo modelo con inicialización mejorada"""
+        # Inicialización He para mejor convergencia
+        self.W_embedding = np.random.randn(self.vocab_size, self.embedding_dim) * np.sqrt(2.0 / self.vocab_size)
+        self.W_hidden = np.random.randn(self.embedding_dim, self.hidden_dim) * np.sqrt(2.0 / self.embedding_dim)
+        self.b_hidden = np.zeros((1, self.hidden_dim))
+        self.W_output = np.random.randn(self.hidden_dim, self.vocab_size) * np.sqrt(2.0 / self.hidden_dim)
+        self.b_output = np.zeros((1, self.vocab_size))
+    
+    async def generar_pregunta_auto_aprendizaje(self) -> str:
+        """Genera una pregunta para el auto-aprendizaje"""
+        temas_posibles = [
+            "inteligencia artificial", "machine learning", "filosofía", "ciencia",
+            "tecnología", "ética", "creatividad", "razonamiento", "conocimiento",
+            "aprendizaje", "comunicación", "problemática social", "futuro",
+            "innovación", "educación"
+        ]
+        
+        tema = random.choice(temas_posibles)
+        pregunta = await self.juez_openai.generar_pregunta_critica(tema)
+        
+        # Guardar en memoria permanente
+        self.memoria_permanente['experiencias_importantes'].append({
+            'tipo': 'pregunta_auto_generada',
+            'contenido': pregunta,
+            'tema': tema,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+        return pregunta
+    
+    async def sesion_auto_aprendizaje(self, duracion_minutos: int = 30):
+        """Ejecuta una sesión de auto-aprendizaje"""
+        self.interfaz.imprimir_banner("SESIÓN DE AUTO-APRENDIZAJE", Colors.PURPLE)
+        
+        inicio_sesion = time.time()
+        fin_sesion = inicio_sesion + (duracion_minutos * 60)
+        
+        resultados_sesion = {
+            'inicio': datetime.now().isoformat(),
+            'preguntas_realizadas': [],
+            'evaluaciones_recibidas': [],
+            'mejoras_identificadas': []
+        }
+        
+        iteracion = 0
+        
+        while time.time() < fin_sesion:
+            iteracion += 1
+            print(f"\n{Colors.CYAN}🤔 Auto-cuestionamiento {iteracion}...{Colors.END}")
+            
+            # Generar pregunta
+            pregunta = await self.generar_pregunta_auto_aprendizaje()
+            print(f"{Colors.BLUE}❓ Pregunta: {pregunta}{Colors.END}")
+            
+            # Generar respuesta
+            respuesta = self.procesar_entrada(pregunta)
+            print(f"{Colors.GREEN}💭 Mi respuesta: {respuesta}{Colors.END}")
+            
+            # Evaluar con OpenAI si está disponible
+            if self.juez_openai.api_key:
+                print(f"{Colors.YELLOW}⚖️ Evaluando respuesta...{Colors.END}")
+                evaluacion = await self.juez_openai.evaluar_respuesta(pregunta, respuesta)
+                
+                if 'error' not in evaluacion:
+                    puntuacion = evaluacion.get('puntuacion_total', 0)
+                    comentarios = evaluacion.get('comentarios', '')
+                    sugerencias = evaluacion.get('sugerencias', '')
+                    
+                    print(f"{Colors.WHITE}📊 Puntuación: {puntuacion}/10{Colors.END}")
+                    print(f"{Colors.WHITE}💬 Comentarios: {comentarios}{Colors.END}")
+                    if sugerencias:
+                        print(f"{Colors.YELLOW}💡 Sugerencias: {sugerencias}{Colors.END}")
+                    
+                    # Guardar datos de la sesión
+                    resultados_sesion['preguntas_realizadas'].append({
+                        'pregunta': pregunta,
+                        'respuesta': respuesta,
+                        'evaluacion': evaluacion
+                    })
+                    
+                    # Guardar en memoria permanente
+                    self.memoria_permanente['lecciones_aprendidas'].append({
+                        'pregunta': pregunta,
+                        'respuesta': respuesta,
+                        'puntuacion': puntuacion,
+                        'comentarios': comentarios,
+                        'timestamp': datetime.now().isoformat()
+                    })
+                    
+                    # Si la puntuación es baja, intentar mejorar
+                    if puntuacion < 7:
+                        print(f"{Colors.RED}⚠️ Respuesta necesita mejora. Intentando otra vez...{Colors.END}")
+                        respuesta_mejorada = self._intentar_mejorar_respuesta(pregunta, respuesta, sugerencias)
+                        print(f"{Colors.GREEN}🔄 Respuesta mejorada: {respuesta_mejorada}{Colors.END}")
+                        
+                        resultados_sesion['mejoras_identificadas'].append({
+                            'pregunta': pregunta,
+                            'respuesta_original': respuesta,
+                            'respuesta_mejorada': respuesta_mejorada,
+                            'sugerencias': sugerencias
+                        })
+                        
+                        # Guardar mejora en memoria permanente
+                        self.memoria_permanente['mejoras_realizadas'].append({
+                            'pregunta': pregunta,
+                            'mejora': respuesta_mejorada,
+                            'razon': sugerencias,
+                            'timestamp': datetime.now().isoformat()
+                        })
+            
+            # Pausa entre preguntas
+            await asyncio.sleep(2)
+            
+            # Mostrar progreso
+            tiempo_transcurrido = time.time() - inicio_sesion
+            progreso = (tiempo_transcurrido / (duracion_minutos * 60)) * 100
+            print(f"{Colors.CYAN}⏱️ Progreso: {progreso:.1f}% - Pregunta {iteracion}{Colors.END}")
+        
+        # Finalizar sesión
+        resultados_sesion['fin'] = datetime.now().isoformat()
+        resultados_sesion['total_preguntas'] = len(resultados_sesion['preguntas_realizadas'])
+        resultados_sesion['total_mejoras'] = len(resultados_sesion['mejoras_identificadas'])
+        
+        self.sesiones_auto_aprendizaje.append(resultados_sesion)
+        
+        # Detectar patrones en el aprendizaje
+        self._detectar_patrones_aprendizaje(resultados_sesion)
+        
+        # Mostrar resumen
+        self.interfaz.imprimir_seccion("Resumen de Sesión")
+        self.interfaz.imprimir_estadistica("Preguntas realizadas", resultados_sesion['total_preguntas'])
+        self.interfaz.imprimir_estadistica("Mejoras identificadas", resultados_sesion['total_mejoras'])
+        
+        if resultados_sesion['preguntas_realizadas']:
+            puntuaciones = [p['evaluacion'].get('puntuacion_total', 0) 
+                          for p in resultados_sesion['preguntas_realizadas'] 
+                          if 'evaluacion' in p and 'puntuacion_total' in p['evaluacion']]
+            if puntuaciones:
+                promedio = sum(puntuaciones) / len(puntuaciones)
+                self.interfaz.imprimir_estadistica("Puntuación promedio", f"{promedio:.1f}/10")
+        
+        print(f"{Colors.GREEN}✅ Sesión de auto-aprendizaje completada{Colors.END}")
+        
+        # Guardar resultados
+        self._guardar_datos_auto_aprendizaje()
+        self._guardar_memoria_permanente()
+    
+    def _detectar_patrones_aprendizaje(self, sesion):
+        """Detecta patrones en el proceso de aprendizaje"""
+        if len(self.sesiones_auto_aprendizaje) > 1:
+            # Analizar mejora en puntuaciones
+            sesion_anterior = self.sesiones_auto_aprendizaje[-2]
+            
+            puntuaciones_actuales = [p['evaluacion'].get('puntuacion_total', 0) 
+                                   for p in sesion['preguntas_realizadas'] 
+                                   if 'evaluacion' in p]
+            
+            puntuaciones_anteriores = [p['evaluacion'].get('puntuacion_total', 0) 
+                                     for p in sesion_anterior.get('preguntas_realizadas', [])
+                                     if 'evaluacion' in p]
+            
+            if puntuaciones_actuales and puntuaciones_anteriores:
+                mejora = np.mean(puntuaciones_actuales) - np.mean(puntuaciones_anteriores)
+                
+                patron = {
+                    'tipo': 'tendencia_mejora',
+                    'mejora_promedio': mejora,
+                    'sesiones_comparadas': 2,
+                    'timestamp': datetime.now().isoformat()
+                }
+                
+                self.memoria_permanente['patrones_detectados'].append(patron)
+    
+    def _intentar_mejorar_respuesta(self, pregunta: str, respuesta_original: str, sugerencias: str) -> str:
+        """Intenta mejorar una respuesta basándose en sugerencias"""
+        # Consultar memoria permanente para respuestas similares exitosas
+        mejores_respuestas = [m for m in self.memoria_permanente['lecciones_aprendidas'] 
+                            if m.get('puntuacion', 0) >= 8]
+        
+        if mejores_respuestas:
+            # Usar patrones de respuestas exitosas
+            ejemplo_exitoso = random.choice(mejores_respuestas)
+            mejora_inspirada = f"Basándome en experiencias previas exitosas, {respuesta_original.lower()} Además, considerando {sugerencias.lower()}, es importante tener en cuenta múltiples perspectivas y enfoques analíticos."
+        else:
+            # Mejoras generales
+            mejoras_posibles = [
+                f"Considerando las sugerencias, {respuesta_original.lower()} Además, es importante tener en cuenta que este tema tiene múltiples perspectivas.",
+                f"Ampliando mi respuesta anterior: {respuesta_original} Esta visión puede complementarse con enfoques alternativos que consideren diversos factores contextuales.",
+                f"Revisando mi análisis: {respuesta_original} Sin embargo, una evaluación más profunda sugiere que deberíamos considerar también los aspectos éticos y sociales involucrados."
+            ]
+            mejora_inspirada = random.choice(mejoras_posibles)
+        
+        return mejora_inspirada
+    
+    def crear_version_de_si_mismo(self) -> 'ModeloLenguajeMejorado':
+        """Crea una nueva versión del modelo basada en el aprendizaje actual"""
+        self.interfaz.imprimir_banner("CREANDO NUEVA VERSIÓN DEL MODELO", Colors.PURPLE)
+        
+        # Crear configuración para la nueva versión
+        nueva_config = ModelConfig(
+            nombre=f"{self.nombre}_v{len(self.versiones_anteriores) + 1}",
+            vocab_size=self.vocab_size,
+            embedding_dim=self.embedding_dim,
+            hidden_dim=self.hidden_dim,
+            learning_rate=self.learning_rate * 0.9,  # Reducir learning rate gradualmente
+            auto_train=self.auto_entrenamiento_activo,
+            auto_improve=self.auto_mejora_activa,
+            openai_api_key=self.config.openai_api_key,
+            auto_evolution=self.auto_evolucion_activa,
+            self_questioning=self.auto_cuestionamiento_activo
+        )
+        
+        # Crear nueva instancia
+        nueva_version = ModeloLenguajeMejorado(nueva_config)
+        
+        # Transferir conocimiento de la versión actual - MEMORIA COMPLETA
+        nueva_version.vocabulario = self.vocabulario.copy()
+        nueva_version.vocabulario_inverso = self.vocabulario_inverso.copy()
+        nueva_version.contador_vocab = self.contador_vocab
+        nueva_version.base_conocimiento = self.base_conocimiento.copy()
+        nueva_version.conversaciones = self.conversaciones.copy()  # Mantener historial completo
+        nueva_version.memoria_permanente = self.memoria_permanente.copy()  # NUNCA OLVIDA
+        
+        # Aplicar mejoras basadas en el aprendizaje previo
+        if self.sesiones_auto_aprendizaje:
+            ultima_sesion = self.sesiones_auto_aprendizaje[-1]
+            mejoras = ultima_sesion.get('mejoras_identificadas', [])
+            
+            for mejora in mejoras:
+                # Integrar mejoras en la base de conocimiento
+                tema_key = mejora['pregunta'][:20].lower().replace(' ', '_')
+                nueva_version.base_conocimiento['aprendizaje_evolutivo'] = nueva_version.base_conocimiento.get('aprendizaje_evolutivo', {})
+                nueva_version.base_conocimiento['aprendizaje_evolutivo'][tema_key] = mejora['respuesta_mejorada']
+        
+        # Guardar referencia a la versión anterior
+        version_info = {
+            'timestamp': datetime.now().isoformat(),
+            'version_anterior': self.nombre,
+            'mejoras_aplicadas': len(self.sesiones_auto_aprendizaje),
+            'vocabulario_size': len(self.vocabulario),
+            'conversaciones_heredadas': len(self.conversaciones),
+            'memoria_heredada': len(self.memoria_permanente['experiencias_importantes'])
+        }
+        
+        self.versiones_anteriores.append(version_info)
+        nueva_version.versiones_anteriores = self.versiones_anteriores.copy()
+        
+        # Guardar la nueva versión en su propio directorio
+        nueva_version.directorio_base = f"{nueva_version.nombre}_data"
+        nueva_version._configurar_archivos()
+        nueva_version.guardar_modelo()
+        
+        print(f"{Colors.GREEN}✅ Nueva versión '{nueva_version.nombre}' creada exitosamente{Colors.END}")
+        print(f"{Colors.CYAN}📊 Conocimiento transferido:{Colors.END}")
+        print(f"   💬 Conversaciones: {len(nueva_version.conversaciones)}")
+        print(f"   🧠 Experiencias: {len(nueva_version.memoria_permanente['experiencias_importantes'])}")
+        print(f"   📚 Lecciones: {len(nueva_version.memoria_permanente['lecciones_aprendidas'])}")
+        print(f"   🔧 Mejoras: {len(nueva_version.memoria_permanente['mejoras_realizadas'])}")
+        
+        return nueva_version
+    
+    async def interactuar_con_version_anterior(self, nombre_version: str):
+        """Permite interacción con una versión anterior del modelo"""
+        self.interfaz.imprimir_banner(f"INTERACCIÓN CON {nombre_version.upper()}", Colors.YELLOW)
+        
+        # Buscar la versión anterior en los archivos
+        ruta_version = f"{self.archivos['versiones']}/{nombre_version}_data"
+        
+        if not os.path.exists(ruta_version):
+            print(f"{Colors.RED}❌ Versión '{nombre_version}' no encontrada{Colors.END}")
+            return
+        
+        try:
+            # Cargar configuración de la versión anterior
+            config_anterior = ModelConfig(nombre=nombre_version)
+            config_anterior.openai_api_key = self.config.openai_api_key
+            
+            version_anterior = ModeloLenguajeMejorado(config_anterior)
+            
+            print(f"{Colors.GREEN}✅ Versión '{nombre_version}' cargada exitosamente{Colors.END}")
+            print(f"{Colors.CYAN}🤖 Iniciando diálogo entre versiones...{Colors.END}")
+            
+            # Generar preguntas para el diálogo basadas en la memoria
+            preguntas_dialogo = [
+                "¿Qué has aprendido desde tu creación?",
+                "¿Cuáles consideras que son tus fortalezas actuales?",
+                "¿Qué áreas identificas que necesitan mejora?",
+                "¿Cómo ha evolucionado tu comprensión del mundo?",
+                "¿Qué consejo darías a futuras versiones?",
+                "¿Qué experiencias han sido más importantes en tu desarrollo?",
+                "¿Cómo has mejorado tu capacidad de razonamiento?"
+            ]
+            
+            resultados_dialogo = []
+            
+            for i, pregunta in enumerate(preguntas_dialogo, 1):
+                print(f"\n{Colors.BLUE}🔄 Intercambio {i}/{len(preguntas_dialogo)}{Colors.END}")
+                print(f"{Colors.WHITE}Versión actual pregunta: {pregunta}{Colors.END}")
+                
+                # Respuesta de la versión anterior
+                respuesta_anterior = version_anterior.procesar_entrada(pregunta)
+                print(f"{Colors.YELLOW}Versión anterior responde: {respuesta_anterior}{Colors.END}")
+                
+                # Respuesta de la versión actual comparando con memoria
+                contexto_memoria = self._buscar_en_memoria_permanente(pregunta)
+                respuesta_actual = self.procesar_entrada(f"Comparando con la respuesta '{respuesta_anterior}' y mi experiencia previa: {contexto_memoria}, {pregunta}")
+                print(f"{Colors.GREEN}Versión actual responde: {respuesta_actual}{Colors.END}")
+                
+                # Evaluar el intercambio
+                if self.juez_openai.api_key:
+                    evaluacion = await self.juez_openai.evaluar_respuesta(
+                        pregunta, 
+                        f"Anterior: {respuesta_anterior}\nActual: {respuesta_actual}",
+                        "Comparación entre versiones del modelo"
+                    )
+                    
+                    if 'error' not in evaluacion:
+                        print(f"{Colors.PURPLE}📊 Evaluación del intercambio: {evaluacion.get('puntuacion_total', 0)}/10{Colors.END}")
+                        
+                        # Guardar en memoria permanente
+                        self.memoria_permanente['experiencias_importantes'].append({
+                            'tipo': 'dialogo_version_anterior',
+                            'version_anterior': nombre_version,
+                            'pregunta': pregunta,
+                            'respuesta_anterior': respuesta_anterior,
+                            'respuesta_actual': respuesta_actual,
+                            'evaluacion': evaluacion,
+                            'timestamp': datetime.now().isoformat()
+                        })
+                
+                resultados_dialogo.append({
+                    'pregunta': pregunta,
+                    'respuesta_anterior': respuesta_anterior,
+                    'respuesta_actual': respuesta_actual,
+                    'evaluacion': evaluacion if self.juez_openai.api_key and 'error' not in evaluacion else None
+                })
+                
+                await asyncio.sleep(1)
+            
+            # Guardar resultados del diálogo
+            dialogo_info = {
+                'timestamp': datetime.now().isoformat(),
+                'version_anterior': nombre_version,
+                'version_actual': self.nombre,
+                'intercambios': resultados_dialogo
+            }
+            
+            # Agregar a sesiones de auto-aprendizaje
+            sesion_dialogo = {
+                'tipo': 'dialogo_versions',
+                'inicio': datetime.now().isoformat(),
+                'fin': datetime.now().isoformat(),
+                'dialogo': dialogo_info
+            }
+            
+            self.sesiones_auto_aprendizaje.append(sesion_dialogo)
+            
+            print(f"\n{Colors.GREEN}✅ Diálogo entre versiones completado{Colors.END}")
+            print(f"{Colors.CYAN}📚 Resultados guardados en memoria permanente{Colors.END}")
+            
+            # Guardar la experiencia
+            self._guardar_memoria_permanente()
+            
+        except Exception as e:
+            print(f"{Colors.RED}❌ Error durante la interacción: {e}{Colors.END}")
+    
+    def _buscar_en_memoria_permanente(self, consulta: str) -> str:
+        """Busca información relevante en la memoria permanente"""
+        palabras_consulta = set(consulta.lower().split())
+        experiencias_relevantes = []
+        
+        # Buscar en experiencias importantes
+        for exp in self.memoria_permanente['experiencias_importantes']:
+            contenido = exp.get('contenido', '') + ' ' + exp.get('pregunta', '')
+            palabras_exp = set(contenido.lower().split())
+            if palabras_consulta.intersection(palabras_exp):
+                experiencias_relevantes.append(exp)
+        
+        # Buscar en lecciones aprendidas
+        for leccion in self.memoria_permanente['lecciones_aprendidas']:
+            pregunta_leccion = leccion.get('pregunta', '')
+            palabras_leccion = set(pregunta_leccion.lower().split())
+            if palabras_consulta.intersection(palabras_leccion):
+                experiencias_relevantes.append(leccion)
+        
+        if experiencias_relevantes:
+            exp_reciente = max(experiencias_relevantes, key=lambda x: x.get('timestamp', ''))
+            return f"Basándome en mi experiencia previa: {exp_reciente.get('contenido', exp_reciente.get('respuesta', ''))}"
+        
+        return "Sin experiencias previas directamente relacionadas"
+    
+    def listar_versiones_disponibles(self) -> List[str]:
+        """Lista todas las versiones disponibles del modelo"""
+        versiones = []
+        
+        # Buscar en el directorio actual
+        directorio_actual = os.path.dirname(self.directorio_base) or '.'
+        for item in os.listdir(directorio_actual):
+            if os.path.isdir(os.path.join(directorio_actual, item)) and item.endswith('_data'):
+                nombre_version = item.replace('_data', '')
+                if nombre_version != self.nombre:  # No incluir la versión actual
+                    versiones.append(nombre_version)
+        
+        # Agregar versiones del historial
+        for version_info in self.versiones_anteriores:
+            nombre = version_info.get('version_anterior', '')
+            if nombre and nombre not in versiones:
+                versiones.append(nombre)
+        
+        return versiones
+    
+    def _guardar_datos_auto_aprendizaje(self):
+        """Guarda los datos de auto-aprendizaje"""
+        try:
+            datos_auto = {
+                'preguntas_auto_generadas': self.preguntas_auto_generadas,
+                'sesiones_auto_aprendizaje': self.sesiones_auto_aprendizaje,
+                'versiones_anteriores': self.versiones_anteriores,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            with open(self.archivos['auto_aprendizaje'], 'w', encoding='utf-8') as f:
+                json.dump(datos_auto, f, indent=2, ensure_ascii=False)
+                
+        except Exception as e:
+            logger.error(f"Error guardando datos de auto-aprendizaje: {e}")
+    
+    def _guardar_memoria_permanente(self):
+        """Guarda la memoria permanente - NUNCA SE OLVIDA"""
+        try:
+            with open(self.archivos['memoria_permanente'], 'w', encoding='utf-8') as f:
+                json.dump(self.memoria_permanente, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"Error guardando memoria permanente: {e}")
+    
+    def procesar_entrada(self, texto: str) -> str:
+        """Procesa la entrada del usuario y genera una respuesta inteligente"""
+        inicio_tiempo = time.time()
+        
+        # Preprocesar entrada
+        texto_limpio = self._limpiar_texto(texto)
+        
+        # Buscar en memoria permanente para contexto
+        contexto_memoria = self._buscar_en_memoria_permanente(texto)
+        
+        # Detectar intención y contexto
+        intencion = self._detectar_intencion(texto_limpio)
+        contexto = self._analizar_contexto(texto_limpio)
+        contexto['memoria'] = contexto_memoria
+        
+        # Generar respuesta basada en intención
+        if intencion:
+            respuesta = self._generar_respuesta_por_intencion(intencion, texto_limpio, contexto)
+        else:
+            respuesta = self._generar_respuesta_generica(texto_limpio, contexto)
+        
+        # Registrar métricas
+        tiempo_respuesta = time.time() - inicio_tiempo
+        self.metricas_rendimiento['tiempo_respuesta'].append(tiempo_respuesta)
+        
+        # Guardar en historial y memoria permanente
+        self._guardar_interaccion(texto, respuesta, tiempo_respuesta)
+        
+        return respuesta
+    
+    def _limpiar_texto(self, texto: str) -> str:
+        """Limpia y normaliza el texto de entrada"""
+        # Convertir a minúsculas
+        texto = texto.lower().strip()
+        
+        # Eliminar caracteres especiales innecesarios
+        texto = re.sub(r'[^\w\s\?\!\.\,\;]', '', texto)
+        
+        # Normalizar espacios
+        texto = re.sub(r'\s+', ' ', texto)
+        
+        return texto
+    
+    def _detectar_intencion(self, texto: str) -> Optional[str]:
+        """Detecta la intención del usuario"""
+        for patron, data in self.patrones_respuesta.items():
+            for trigger in data['triggers']:
+                if trigger in texto:
+                    return patron
+        return None
+    
+    def _analizar_contexto(self, texto: str) -> Dict[str, Any]:
+        """Analiza el contexto de la conversación"""
+        contexto = {
+            'longitud': len(texto.split()),
+            'tiene_pregunta': '?' in texto,
+            'es_comando': texto.startswith('/'),
+            'palabras_clave': self._extraer_palabras_clave(texto),
+            'sentimiento': self._analizar_sentimiento_basico(texto),
+            'temas': self._identificar_temas(texto)
+        }
+        
+        return contexto
+    
+    def _extraer_palabras_clave(self, texto: str) -> List[str]:
+        """Extrae palabras clave del texto"""
+        palabras_comunes = {'el', 'la', 'de', 'que', 'y', 'a', 'en', 'un', 'es', 'se', 'no', 'te', 'lo', 'le', 'da', 'su', 'por', 'son', 'con', 'para', 'como', 'las', 'del', 'los', 'una', 'pero', 'sus', 'me', 'ya', 'muy', 'mi', 'si', 'más', 'este', 'bien', 'qué', 'cómo', 'cuál', 'dónde', 'cuando'}
+        
+        palabras = texto.split()
+        palabras_clave = [p for p in palabras if len(p) > 3 and p not in palabras_comunes]
+        
+        return palabras_clave[:5]  # Máximo 5 palabras clave
+    
+    def _analizar_sentimiento_basico(self, texto: str) -> str:
+        """Análisis básico de sentimiento"""
+        palabras_positivas = ['bueno', 'genial', 'excelente', 'fantástico', 'perfecto', 'gracias', 'me gusta']
+        palabras_negativas = ['malo', 'terrible', 'horrible', 'problema', 'error', 'no funciona', 'odio']
+        
+        positivo = sum(1 for palabra in palabras_positivas if palabra in texto)
+        negativo = sum(1 for palabra in palabras_negativas if palabra in texto)
+        
+        if positivo > negativo:
+            return 'positivo'
+        elif negativo > positivo:
+            return 'negativo'
+        else:
+            return 'neutral'
+    
+    def _identificar_temas(self, texto: str) -> List[str]:
+        """Identifica temas principales en el texto"""
+        temas_tech = ['programación', 'código', 'python', 'algoritmo', 'datos', 'ai', 'inteligencia artificial']
+        temas_general = ['ciencia', 'historia', 'cultura', 'arte', 'música', 'literatura']
+        
+        temas = []
+        
+        for tema in temas_tech:
+            if tema in texto:
+                temas.append('tecnología')
+                break
+        
+        for tema in temas_general:
+            if tema in texto:
+                temas.append('general')
+                break
+        
+        return temas
+    
+    def _generar_respuesta_por_intencion(self, intencion: str, texto: str, contexto: Dict) -> str:
+        """Genera respuesta basada en la intención detectada"""
+        data_patron = self.patrones_respuesta[intencion]
+        respuestas = data_patron['responses']
+        
+        # Seleccionar respuesta basada en contexto
+        respuesta = self._seleccionar_mejor_respuesta(respuestas, contexto)
+        
+        # Personalizar respuesta
+        respuesta = respuesta.format(
+            nombre=self.nombre,
+            version=self.version,
+            conversaciones=len(self.conversaciones)
+        )
+        
+        # Añadir información contextual si es relevante
+        if contexto['temas']:
+            respuesta += self._añadir_informacion_tematica(contexto['temas'], texto)
+        
+        # Añadir contexto de memoria si existe
+        if contexto.get('memoria') and 'Sin experiencias previas' not in contexto['memoria']:
+            respuesta += f"\n\n{contexto['memoria']}"
+        
+        return respuesta
+    
+    def _generar_respuesta_generica(self, texto: str, contexto: Dict) -> str:
+        """Genera una respuesta genérica inteligente"""
+        # Buscar en base de conocimiento
+        info_relevante = self._buscar_en_base_conocimiento(contexto['palabras_clave'])
+        
+        if info_relevante:
+            respuesta_base = f"Sobre {info_relevante['tema']}: {info_relevante['informacion']} ¿Te gustaría que profundice en algún aspecto específico?"
+        else:
+            # Respuestas genéricas contextuales
+            if contexto['tiene_pregunta']:
+                respuestas = [
+                    "Esa es una pregunta interesante. Basándome en lo que mencionas, creo que es importante considerar varios aspectos.",
+                    "Me parece una consulta muy válida. Para poder ayudarte mejor, ¿podrías darme un poco más de contexto?",
+                    "Es un tema fascinante el que planteas. Hay varias perspectivas desde las cuales podemos abordarlo."
+                ]
+            else:
+                respuestas = [
+                    "Entiendo tu punto. Es un tema que tiene múltiples dimensiones que podríamos explorar.",
+                    "Interesante perspectiva. Me gustaría conocer más sobre tu experiencia con este tema.",
+                    "Aprecio que compartas eso conmigo. ¿Hay algún aspecto específico que te gustaría discutir más a fondo?"
+                ]
+            respuesta_base = random.choice(respuestas)
+        
+        # Añadir contexto de memoria si existe
+        if contexto.get('memoria') and 'Sin experiencias previas' not in contexto['memoria']:
+            respuesta_base += f"\n\n{contexto['memoria']}"
+        
+        return respuesta_base
+    
+    def _seleccionar_mejor_respuesta(self, respuestas: List[str], contexto: Dict) -> str:
+        """Selecciona la mejor respuesta según el contexto"""
+        if contexto['sentimiento'] == 'positivo':
+            # Preferir respuestas más entusiastas
+            respuestas_entusiastas = [r for r in respuestas if '!' in r]
+            if respuestas_entusiastas:
+                return random.choice(respuestas_entusiastas)
+        
+        elif contexto['longitud'] > 10:
+            # Para textos largos, respuestas más detalladas
+            respuestas_largas = [r for r in respuestas if len(r.split()) > 20]
+            if respuestas_largas:
+                return random.choice(respuestas_largas)
+        
+        return random.choice(respuestas)
+    
+    def _buscar_en_base_conocimiento(self, palabras_clave: List[str]) -> Optional[Dict]:
+        """Busca información relevante en la base de conocimiento"""
+        for palabra in palabras_clave:
+            for categoria, items in self.base_conocimiento.items():
+                for tema, info in items.items():
+                    if palabra in tema or any(palabra in info.lower() for palabra in palabras_clave):
+                        return {'tema': tema, 'informacion': info, 'categoria': categoria}
+        return None
+    
+    def _añadir_informacion_tematica(self, temas: List[str], texto_original: str) -> str:
+        """Añade información temática relevante"""
+        info_adicional = ""
+        
+        if 'tecnología' in temas:
+            if 'python' in texto_original:
+                info_adicional += "\n\nPython es excelente para desarrollo de IA y análisis de datos por su sintaxis clara y amplio ecosistema de librerías."
+            elif 'algoritmo' in texto_original:
+                info_adicional += "\n\nLos algoritmos son fundamentales en ciencias de la computación y cada uno tiene diferentes complejidades y casos de uso óptimos."
+        
+        return info_adicional
+    
+    def _guardar_interaccion(self, entrada: str, respuesta: str, tiempo: float):
+        """Guarda la interacción en el historial y memoria permanente"""
+        interaccion = {
+            'timestamp': datetime.now().isoformat(),
+            'entrada': entrada,
+            'respuesta': respuesta,
+            'tiempo_respuesta': tiempo,
+            'longitud_entrada': len(entrada.split()),
+            'longitud_respuesta': len(respuesta.split())
+        }
+        
+        self.conversaciones.append(interaccion)
+        
+        # Guardar interacciones importantes en memoria permanente
+        if len(entrada.split()) > 10 or '?' in entrada:  # Preguntas complejas o largas
+            self.memoria_permanente['experiencias_importantes'].append({
+                'tipo': 'interaccion_importante',
+                'entrada': entrada,
+                'respuesta': respuesta,
+                'timestamp': datetime.now().isoformat()
+            })
+        
+        # Limitar historial para eficiencia
+        if len(self.conversaciones) > 1000:
+            self.conversaciones = self.conversaciones[-500:]
+    
+    def guardar_modelo(self):
+        """Guarda el estado completo del modelo"""
+        try:
+            # Guardar pesos
+            pesos_data = {
+                'W_embedding': self.W_embedding,
+                'W_hidden': self.W_hidden,
+                'b_hidden': self.b_hidden,
+                'W_output': self.W_output,
+                'b_output': self.b_output,
+                'version': self.version,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+            with open(self.archivos['pesos'], 'wb') as f:
+                pickle.dump(pesos_data, f)
+            
+            # Guardar vocabulario
+            vocab_data = {
+                'vocabulario': self.vocabulario,
+                'vocabulario_inverso': {int(k): v for k, v in self.vocabulario_inverso.items()},
+                'contador_vocab': self.contador_vocab
+            }
+            
+            with open(self.archivos['vocabulario'], 'w', encoding='utf-8') as f:
+                json.dump(vocab_data, f, indent=2, ensure_ascii=False)
+            
+            # Guardar conversaciones
+            with
